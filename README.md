@@ -197,14 +197,20 @@ reconnexion, ville de Londres complète et visitable (tous les bâtiments ont un
 déplacement en 1re et 3e personne, combats (revolver, fusil, carabine, couteau, matraque, poings),
 IA des gangsters, voyous, policiers et lieutenants, ordres exécutés physiquement, captures,
 territoires, économie, améliorations, police et niveau de recherche, événements aléatoires,
-journal, victoire et revanche, paramètres graphiques, sonores et touches modifiables.
+journal, victoire et revanche, paramètres graphiques, sonores et touches modifiables, passants qui
+fuient les coups de feu et fiacres tirés par des chevaux dans les rues.
+
+Vérifié automatiquement : 47 contrôles sans navigateur (`npm test`), un scénario réseau complet
+(`tests/rematch.mjs`) et un parcours de bout en bout dans Chromium (`tests/e2e.mjs`). Une
+simulation de charge (230 gangsters qui se battent) tient en 2 à 4 ms par tick serveur.
 
 Limites actuelles, en toute transparence :
 
 - Les **passants** sont simulés localement par chaque navigateur : les deux joueurs ne voient pas
   exactement la même foule (les gangsters, lieutenants, policiers et parrains, eux, sont
   synchronisés par le serveur).
-- Pas encore de **fiacres** ni de chevaux circulant dans les rues.
+- Les **fiacres** qui circulent dans les rues sont, comme les passants, propres à chaque
+  navigateur et purement décoratifs (ils s’arrêtent devant les piétons mais ne bloquent personne).
 - La ville est générée par chaque client au démarrage (quelques secondes, dans un *worker*).
 - Le jeu demande une carte graphique : sur une machine sans accélération matérielle (rendu
   logiciel), les menus et le jeu deviennent très lents. Les réglages « Basse » ou « Moyenne »
