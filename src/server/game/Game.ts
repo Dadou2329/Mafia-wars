@@ -900,6 +900,11 @@ export class Game {
         if (typeof act.dayTime === 'number') this.dayTime = ((act.dayTime % 1) + 1) % 1;
         break;
       }
+      case 'debugEnd': {
+        if (process.env.MW_DEBUG !== '1') return;
+        this.endGame(slot, `${BOSS_NAME[slot]} a pris le quartier général ${DE_BOSS[otherSlot(slot)]} ! (fin de test)`);
+        break;
+      }
       case 'interact': {
         // passant abattu (les passants n'existent que chez le client) : la police s'en mêle
         if (act.what === 'civilian') {

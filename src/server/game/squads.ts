@@ -362,9 +362,9 @@ export function updateSquad(g: Game, sq: Squad, dt: number): void {
           const owner = g.bstate.get(b.id)!.owner;
           const os = owner === Faction.DADOU ? 'dadou' : owner === Faction.EVEN ? 'even' : null;
           g.notify(sq.slot, `${sq.name} lance l’assaut sur ${b.name} !`, 'info');
-          if (os && os !== sq.slot) g.notify(os, `ALERTE — ${BOSS_NAME[sq.slot]} attaque ${b.name} (${DISTRICT_BY_ID[b.district].name}) !`, 'alert', `atk-${b.id}`, 30);
+          if (os && os !== sq.slot) g.notify(os, `ALERTE — ${BOSS_NAME[sq.slot]} attaque ${leNom(b.name)} (${DISTRICT_BY_ID[b.district].name}) !`, 'alert', `atk-${b.id}`, 30);
           else if (g.districtOwner.get(b.district) !== mine && HOME_DISTRICT[sq.slot] !== b.district)
-            g.notify(otherSlot(sq.slot), `${BOSS_NAME[sq.slot]} attaque ${DISTRICT_BY_ID[b.district].name} !`, 'alert', `atkd-${b.district}`, 90);
+            g.notify(otherSlot(sq.slot), `${BOSS_NAME[sq.slot]} attaque ${leNom(DISTRICT_BY_ID[b.district].name)} !`, 'alert', `atkd-${b.district}`, 90);
         } else {
           setState(g, sq, 'hold');
         }

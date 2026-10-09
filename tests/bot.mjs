@@ -23,7 +23,12 @@ socket.on('game:init', () => {
   started = true;
 });
 socket.on('ev', (evs) => {
-  for (const e of evs) if (e.t === 'over') log('fin de partie :', e.winner, e.reason);
+  for (const e of evs)
+    if (e.t === 'over') {
+      log('fin de partie :', e.winner, e.reason);
+      // le robot accepte toujours la revanche
+      setTimeout(() => socket.emit('act', { a: 'rematch' }), 1500);
+    }
 });
 socket.on('disconnect', () => log('déconnecté'));
 process.on('SIGTERM', () => process.exit(0));

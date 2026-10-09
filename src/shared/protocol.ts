@@ -162,7 +162,9 @@ export type ClientAction =
   | { a: 'interact'; what: string }
   | { a: 'rematch' }
   /** Outil de test : téléportation (serveur lancé avec MW_DEBUG=1 uniquement). */
-  | { a: 'debugTp'; x: number; z: number; yaw?: number; dayTime?: number };
+  | { a: 'debugTp'; x: number; z: number; yaw?: number; dayTime?: number }
+  /** Outil de test : termine la partie (serveur lancé avec MW_DEBUG=1 uniquement). */
+  | { a: 'debugEnd' };
 
 // ---------------------------------------------------------------------------- instantanés binaires
 
