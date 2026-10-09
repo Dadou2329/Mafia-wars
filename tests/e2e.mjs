@@ -3,6 +3,7 @@
 // changement de vue, pause). Usage : node tests/e2e.mjs [dossier de sortie]
 // Prérequis : serveur de jeu (port 3000) et Vite (port 5173) lancés.
 import { chromium } from 'playwright';
+import { spawn } from 'node:child_process';
 import fs from 'node:fs';
 
 const OUT = process.argv[2] ?? 'test-output';
@@ -16,6 +17,17 @@ const browser = await chromium.launch({ args: ['--use-angle=swiftshader', '--ena
 const errors = [];
 async function client(name) {
   const ctx = await browser.newContext({ viewport: { width: W, height: H } });
+  // LOWGFX=1 : graphismes au minimum (machines sans carte graphique / rendu logiciel)
+  if (process.env.LOWGFX)
+    await ctx.addInitScript(() => {
+      try {
+        const k = 'mafiawars.settings.v1';
+        const cur = JSON.parse(localStorage.getItem(k) || '{}');
+        localStorage.setItem(k, JSON.stringify({ ...cur, quality: 'basse', renderScale: 0.5, bloom: false }));
+      } catch {
+        /* stockage indisponible */
+      }
+    });
   const page = await ctx.newPage();
   page.on('console', (m) => {
     const t = m.text();
@@ -31,14 +43,18 @@ async function client(name) {
   return page;
 }
 const shot = async (page, file) => {
-  await page.screenshot({ path: `${OUT}/${file}` });
+  await page.screenshot({ path: `${OUT}/${file}`, timeout: 180000 });
   console.log('capture', file);
 };
 const step = (s) => console.log(`\n=== ${s}`);
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
+// BOT=1 : le second joueur est un client Socket.IO sans navigateur (tests/bot.mjs),
+// pour ne faire tourner qu'un seul rendu WebGL sur les machines lentes.
+const BOT = !!process.env.BOT;
 const A = await client('Dadou');
-const B = await client('Even');
+const B = BOT ? null : await client('Even');
+let bot = null;
 
 step('Menu');
 await A.goto(URL, { timeout: 180000, waitUntil: 'domcontentloaded' });
@@ -52,37 +68,64 @@ await A.waitForFunction(() => window.__app?.net?.room?.code, null, { timeout: 30
 const code = await A.evaluate(() => window.__app.net.room.code);
 console.log('code du salon :', code);
 await sleep(800);
-await shot(A, '02-lobby-host.png');
+await shot(A, '02-lobby-host.png').catch(() => console.log('capture du salon trop lente'));
 
 step('Invité rejoint');
-await B.goto(`${URL}?code=${code}`, { timeout: 180000, waitUntil: 'domcontentloaded' });
-await B.waitForFunction(() => window.__app?.net?.room?.code, null, { timeout: 60000 });
+if (BOT) {
+  bot = spawn(process.execPath, ['tests/bot.mjs', code, 'even', new globalThis.URL(URL).origin], { stdio: 'inherit' });
+  await A.waitForFunction(() => Object.keys(window.__app.net.room?.players ?? {}).length === 2, null, { timeout: 60000 });
+} else {
+  await B.goto(`${URL}?code=${code}`, { timeout: 180000, waitUntil: 'domcontentloaded' });
+  await B.waitForFunction(() => window.__app?.net?.room?.code, null, { timeout: 60000 });
+}
 await sleep(2000);
 
 step('Choix des parrains');
-await A.click('.btn.dadou.mw-card-pick', { timeout: 60000 });
-await sleep(800);
-await B.click('.btn.even.mw-card-pick', { timeout: 60000 });
+// API_LOBBY=1 : on passe par le réseau plutôt que par les boutons (rendu logiciel trop lent)
+if (BOT) {
+  await A.evaluate(() => window.__app.net.pick('dadou'));
+} else if (process.env.API_LOBBY) {
+  await A.evaluate(() => window.__app.net.pick('dadou'));
+  await sleep(800);
+  await B.evaluate(() => window.__app.net.pick('even'));
+} else {
+  await A.click('.btn.dadou.mw-card-pick', { timeout: 60000 });
+  await sleep(800);
+  await B.click('.btn.even.mw-card-pick', { timeout: 60000 });
+}
 await sleep(800);
 const picks = await A.evaluate(() => window.__app.net.room.picks);
 console.log('choix :', JSON.stringify(picks));
 // Dadou est pris : le bouton de l'invité doit être indisponible
-const evenSees = await B.evaluate(() => document.querySelector('.btn.dadou.mw-card-pick')?.textContent);
-console.log('Bouton Dadou vu par Even :', evenSees);
-await shot(A, '03-lobby-picks-A.png');
-await shot(B, '03-lobby-picks-B.png');
+if (B) {
+  const evenSees = await B.evaluate(() => document.querySelector('.btn.dadou.mw-card-pick')?.textContent);
+  console.log('Bouton Dadou vu par Even :', evenSees);
+} else {
+  const evenSees = await A.evaluate(() => document.querySelector('.btn.even.mw-card-pick')?.textContent);
+  console.log('Bouton Even vu par Dadou (pris par le robot) :', evenSees);
+}
+await shot(A, '03-lobby-picks-A.png').catch(() => console.log('capture du salon trop lente'));
+if (B) await shot(B, '03-lobby-picks-B.png').catch(() => console.log('capture du salon trop lente'));
 
 step('Prêts');
-await A.click('.mw-ready', { timeout: 60000 });
-await sleep(800);
-await B.click('.mw-ready', { timeout: 60000 });
+if (BOT) {
+  await A.evaluate(() => window.__app.net.setReady(true));
+} else if (process.env.API_LOBBY) {
+  await A.evaluate(() => window.__app.net.setReady(true));
+  await sleep(800);
+  await B.evaluate(() => window.__app.net.setReady(true));
+} else {
+  await A.click('.mw-ready', { timeout: 60000 });
+  await sleep(800);
+  await B.click('.mw-ready', { timeout: 60000 });
+}
 const t0 = Date.now();
 await A.waitForFunction(() => window.__app?.game && window.__app.game.placed === true, null, { timeout: 240000 });
-await B.waitForFunction(() => window.__app?.game && window.__app.game.placed === true, null, { timeout: 240000 });
+if (B) await B.waitForFunction(() => window.__app?.game && window.__app.game.placed === true, null, { timeout: 240000 });
 console.log(`partie lancée et joueurs placés en ${((Date.now() - t0) / 1000).toFixed(1)} s`);
 await sleep(4000);
 await shot(A, '04-game-A.png');
-await shot(B, '04-game-B.png');
+if (B) await shot(B, '04-game-B.png');
 
 const state = (page) =>
   page.evaluate(() => {
@@ -100,22 +143,24 @@ const state = (page) =>
     };
   });
 console.log('A', JSON.stringify(await state(A)));
-console.log('B', JSON.stringify(await state(B)));
+if (B) console.log('B', JSON.stringify(await state(B)));
 
-step('Déplacement (Z/W maintenu 2 s)');
+step('Déplacement (S maintenu 2 s : on recule, le bureau est devant)');
 await A.mouse.click(W / 2, H / 2);
 const before = await A.evaluate(() => window.__app.game.player.pos.clone());
-await A.keyboard.down('KeyW');
+await A.keyboard.down('KeyS');
 await sleep(2000);
-await A.keyboard.up('KeyW');
+await A.keyboard.up('KeyS');
 await sleep(600);
 const after = await A.evaluate(() => window.__app.game.player.pos.clone());
 console.log('déplacement local :', JSON.stringify(before), '→', JSON.stringify(after));
-const seenByB = await B.evaluate(() => {
-  const e = window.__app.game.store.ents.get(1);
-  return e ? [e.x.toFixed(2), e.z.toFixed(2)] : null;
-});
-console.log('position de Dadou vue par Even :', seenByB);
+if (B) {
+  const seenByB = await B.evaluate(() => {
+    const e = window.__app.game.store.ents.get(1);
+    return e ? [e.x.toFixed(2), e.z.toFixed(2)] : null;
+  });
+  console.log('position de Dadou vue par Even :', seenByB);
+}
 
 step('Tir');
 const ammo0 = await A.evaluate(() => window.__app.game.weapons.mag.get(1));
@@ -201,9 +246,12 @@ await shot(A, '14-pause-A.png');
 await A.click('.mw-pause-resume');
 await sleep(500);
 
-step('Vue d’Even');
-await shot(B, '15-game-B.png');
-console.log('B', JSON.stringify(await state(B)));
+if (B) {
+  step('Vue d’Even');
+  await shot(B, '15-game-B.png');
+  console.log('B', JSON.stringify(await state(B)));
+}
 
 console.log('\nErreurs :', errors.length ? errors.join('\n') : 'aucune');
 await browser.close();
+bot?.kill('SIGTERM');

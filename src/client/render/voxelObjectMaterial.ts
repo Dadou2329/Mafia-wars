@@ -105,7 +105,8 @@ vec3 albedo = pow(vColor.rgb, vec3(2.2));
 vec3 gEm = vec3(0.0);
 float gSpec = 0.0;
 if (vSlot >= 1 && vSlot <= 3) {
-  albedo = pow(uFaction[clamp(vOwner, 0, 2) * 3 + vSlot - 1], vec3(2.2));
+  // les couleurs THREE.Color sont déjà linéaires (gestion des couleurs active)
+  albedo = uFaction[clamp(vOwner, 0, 2) * 3 + vSlot - 1];
   gSpec = vSlot == 2 ? 0.5 : 0.0;
 } else if (vSlot == 4) {
   albedo = vec3(1.0, 0.75, 0.4);

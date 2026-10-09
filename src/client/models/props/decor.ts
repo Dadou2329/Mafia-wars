@@ -2,7 +2,7 @@
 // Résolution 1/16 m, origine au centre de la base, l'avant regarde vers +Z.
 // Objets muraux : dos à z = 0 contre le mur, origine à la demi-profondeur déclarée.
 
-import { C, P, SLOT, VoxelModel, shade, mix, grain, blockJitter, speckle, colors, pix, curve, line6, wheel, discXY, hash3, rng, framePanel, turnedLeg, drawer, rotate180 } from './helpers';
+import { C, P, SLOT, VoxelModel, shade, grain, pix, curve, line6, discXY, hash3, rng, framePanel, turnedLeg, drawer, rotate180 } from './helpers';
 
 const I = C.iron;
 const G = C.gold;
@@ -553,27 +553,22 @@ export function dartboard(): VoxelModel {
   return m;
 }
 
-/** Globe terrestre sur pied tourné (Empire britannique en rose). */
+/** Globe terrestre de bibliothèque sur trépied, cercle d'horizon et méridien de laiton. */
 export function globe(): VoxelModel {
   const m = new VoxelModel(10, 18, 10);
   const w = C.walnut;
-  // trépied et entretoise
+  // trépied à pieds galbés et entretoise
   for (const [x, z] of [
     [1, 2],
     [8, 2],
     [4, 8],
   ]) {
-    line6(m, x, 0, z, 4 + (x > 4 ? 1 : 0), 8, 4 + (z > 4 ? 1 : 0), w);
+    m.set(x, 0, z, shade(w, 0.8));
+    line6(m, x, 1, z, x > 4 ? 5 : 4, 8, z > 4 ? 5 : 4, w);
   }
   m.box(4, 3, 4, 6, 4, 6, shade(w, 1.2));
-  m.box(4, 8, 4, 6, 9, 6, w);
-  // cercle d'horizon
-  for (let x = 0; x < 10; x++)
-    for (let z = 0; z < 10; z++) {
-      const d = Math.hypot(x + 0.5 - 5, z + 0.5 - 5);
-      if (d > 3.6 && d <= 5) m.set(x, 12, z, d > 4.4 ? w : P.parchment);
-    }
-  // sphère : océans pâles, continents (carte grossière lat/lon)
+  m.box(4, 7, 4, 6, 9, 6, w);
+  // sphère : océans bleu-vert, continents colorés (Empire britannique en rose)
   const MAP = [
     '........................',
     '...ppp....gg.yyyyyy.....',
@@ -588,29 +583,35 @@ export function globe(): VoxelModel {
     '..........xxxxx.........',
     '........................',
   ];
-  const CC: Record<string, number> = { p: 0xd88a9a, g: 0x8aaa5a, y: 0xd8c070, o: 0xd89a4a, x: 0xf0f0f0 };
-  const cy = 12.5;
+  const CC: Record<string, number> = { p: 0xd8848e, g: 0x8aaa5a, y: 0xd8c070, o: 0xd8984a, x: 0xf0f0f0 };
+  const cy = 13;
+  const R = 4.1;
   for (let x = 0; x < 10; x++)
     for (let y = 8; y < 18; y++)
       for (let z = 0; z < 10; z++) {
         const dx = x + 0.5 - 5;
         const dy = y + 0.5 - cy;
         const dz = z + 0.5 - 5;
-        if (dx * dx + dy * dy + dz * dz > 3.9 * 3.9) continue;
-        const lat = Math.asin(Math.max(-1, Math.min(1, dy / 3.9)));
+        if (dx * dx + dy * dy + dz * dz > R * R) continue;
+        const lat = Math.asin(Math.max(-1, Math.min(1, dy / R)));
         const lon = Math.atan2(dx, dz);
         const row = Math.floor(((Math.PI / 2 - lat) / Math.PI) * 12);
         const col = Math.floor(((lon + Math.PI) / (Math.PI * 2)) * 24 + 10) % 24;
         const ch = MAP[Math.min(11, Math.max(0, row))][col];
-        m.set(x, y, z, ch === '.' ? 0x9ec0b8 : CC[ch]);
+        m.set(x, y, z, ch === '.' ? 0x5e8e9a : CC[ch]);
       }
-  // méridien de laiton
-  for (let y = 8; y < 18; y++) {
-    const dy = y + 0.5 - cy;
-    const xx = Math.sqrt(Math.max(0, 4.4 * 4.4 - dy * dy));
-    m.set(Math.floor(5 - xx), y, 5, C.brass).set(Math.floor(5 + xx - 0.01), y, 5, C.brass);
-  }
-  m.set(4, 17, 5, C.brass);
+  // cercle d'horizon (bois clair et papier gradué)
+  for (let x = 0; x < 10; x++)
+    for (let z = 0; z < 10; z++) {
+      const d = Math.hypot(x + 0.5 - 5, z + 0.5 - 5);
+      if (d > 4.1 && d <= 5) m.set(x, 12, z, (x + z) % 3 === 0 ? P.parchment : shade(w, 1.2));
+    }
+  // méridien de laiton (anneau vertical dans le plan XY)
+  for (let x = 0; x < 10; x++)
+    for (let y = 8; y < 18; y++) {
+      const d = Math.hypot(x + 0.5 - 5, y + 0.5 - cy);
+      if (d > 4.2 && d <= 5.0 && y >= 9) m.set(x, y, 5, C.brass);
+    }
   m.setOrigin(5, 0, 5);
   return m;
 }
@@ -637,25 +638,27 @@ export function typewriter(): VoxelModel {
   return rotate180(m);
 }
 
-/** Télégraphe : manipulateur Morse de laiton et parleur. Comme un bureau : l'opérateur est côté -Z. */
+/** Télégraphe : manipulateur Morse de laiton et parleur à électro-aimants. Comme un bureau : l'opérateur est côté -Z. */
 export function telegraph(): VoxelModel {
   const m = new VoxelModel(8, 6, 6);
   const w = C.mahogany;
   m.box(0, 0, 0, 8, 1, 6, w);
-  m.box(0, 0, 0, 8, 1, 1, shade(w, 0.8));
-  // manipulateur à l'avant
-  m.box(2, 1, 3, 5, 2, 5, C.brass);
-  m.box(3, 2, 2, 4, 3, 6, C.brass);
-  m.set(3, 3, 5, C.black);
-  // parleur à l'arrière
-  m.box(5, 1, 0, 7, 4, 2, C.copper);
-  m.box(5, 4, 0, 8, 5, 2, C.brass);
-  m.set(7, 4, 1, P.brassLight);
-  // bornes et cadran ABC
-  m.box(0, 1, 0, 3, 5, 1, C.brass);
-  m.box(1, 2, 0, 2, 4, 1, P.cream);
-  m.set(1, 3, 0, C.black);
-  for (const x of [0, 7]) m.set(x, 1, 4, C.brass);
+  m.box(0, 0, 5, 8, 1, 6, shade(w, 1.2));
+  // manipulateur Morse (devant, côté opérateur avant rotation)
+  m.box(2, 1, 3, 6, 2, 6, C.brass);
+  m.box(3, 2, 3, 5, 3, 4, C.brassDark);
+  m.box(3, 3, 2, 5, 4, 6, P.brassLight);
+  m.box(3, 3, 5, 5, 5, 6, C.black);
+  // parleur : deux bobines noires cerclées de cuivre, armature de laiton
+  for (const x of [1, 5]) {
+    m.box(x, 1, 0, x + 2, 4, 2, C.black);
+    m.box(x, 2, 0, x + 2, 3, 2, C.copper);
+  }
+  m.box(1, 4, 0, 7, 5, 2, C.brass);
+  m.box(7, 1, 0, 8, 6, 1, C.brass);
+  m.box(0, 5, 0, 8, 6, 1, C.brass);
+  // bornes
+  m.set(0, 1, 3, C.brass).set(7, 1, 3, C.brass);
   m.setOrigin(4, 0, 3);
   return rotate180(m);
 }
@@ -806,9 +809,3 @@ export function washStand(): VoxelModel {
   return m;
 }
 
-void G;
-void mix;
-void blockJitter;
-void speckle;
-void colors;
-void wheel;

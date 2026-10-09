@@ -27,11 +27,15 @@ export function pct(f: number): string {
 
 const BASE = import.meta.env.BASE_URL;
 
-/** Identité visuelle (fichiers servis depuis /public). */
+/**
+ * Identité visuelle (fichiers servis depuis /public). On utilise les rendus PNG des SVG de
+ * marque : les SVG contiennent de nombreux flous (filtres), que le navigateur recalculerait à
+ * chaque nouveau tramage des zones qui les contiennent (survol d'une carte, changement d'état…).
+ */
 export const BRAND = {
-  logo: `${BASE}brand/logo.svg`,
-  compact: `${BASE}brand/logo-compact.svg`,
-  emblem: { dadou: `${BASE}brand/emblem-dadou.svg`, even: `${BASE}brand/emblem-even.svg` } as Record<Slot, string>,
+  logo: `${BASE}brand/logo.png`,
+  compact: `${BASE}brand/logo-compact.png`,
+  emblem: { dadou: `${BASE}brand/emblem-dadou.png`, even: `${BASE}brand/emblem-even.png` } as Record<Slot, string>,
 };
 
 export const TITLE = `MAFIA WARS${NBSP}: Dadou vs Even`;
@@ -54,7 +58,7 @@ const ICONS = {
   close: '<path d="M6 6l12 12M18 6L6 18"/>',
   info: '<circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.5v.5"/>',
   alert: '<path d="M12 3.5l9.5 16.5h-19z"/><path d="M12 10v4.5M12 17v.5"/>',
-  play: '<path d="M8 5.5l11 6.5-11 6.5z"/>',
+  play: '<path d="M8 5.5l11 6.5-11 6.5z" fill="currentColor"/>',
   pause: '<path d="M8.5 5v14M15.5 5v14"/>',
   trophy: '<path d="M7.5 4h9v5a4.5 4.5 0 0 1-9 0z"/><path d="M7.5 6H4.5c0 3 1.3 4.5 3.3 4.8M16.5 6h3c0 3-1.3 4.5-3.3 4.8M12 13.5V17M8.5 20h7l-1-3h-5z"/>',
   flag: '<path d="M5.5 21V4M5.5 4.5h12l-2.5 4 2.5 4h-12"/>',
@@ -130,6 +134,24 @@ export function watchUnmount(el: HTMLElement, fn: () => void): () => void {
     if (seen || ++idle > 25) stop();
   }, 400);
   return stop;
+}
+
+/**
+ * Garde les clics d'interface pour l'interface : un clic dans un menu ne doit jamais atteindre
+ * l'écouteur « mousedown » des entrées de jeu (tir, capture du pointeur).
+ * `withParent` protège aussi le conteneur dans lequel l'application place le panneau.
+ */
+export function shieldPointer(el: HTMLElement, withParent = false): void {
+  const stop = (e: Event): void => e.stopPropagation();
+  el.addEventListener('mousedown', stop);
+  if (!withParent) return;
+  requestAnimationFrame(() => {
+    const p = el.parentElement;
+    if (p && p.dataset.mwShield !== '1') {
+      p.dataset.mwShield = '1';
+      p.addEventListener('mousedown', stop);
+    }
+  });
 }
 
 /** Une partie est-elle en cours (la touche Échap appartient alors au jeu) ? */
@@ -260,7 +282,7 @@ export function choose(
   });
 }
 
-/** Couches d'ambiance du fond de menu : réverbères qui vacillent, brouillard qui dérive. */
+/** Couches d'ambiance du fond de menu : réverbères qui vacillent, brouillard qui dérive (opacité et translation seulement). */
 export function ambience(withLamps = true): HTMLElement {
   return h(
     'div',
@@ -271,8 +293,6 @@ export function ambience(withLamps = true): HTMLElement {
           { class: 'mw-cover' },
           h('span', { class: 'mw-lamp mw-lamp--l' }),
           h('span', { class: 'mw-lamp mw-lamp--r' }),
-          h('span', { class: 'mw-clockglow' }),
-          h('span', { class: 'mw-moonglow' }),
         )
       : null,
     h('div', { class: 'mw-fog mw-fog--far' }),
@@ -576,6 +596,7 @@ export function mainMenu(app: AppApi): HTMLElement {
   };
   window.addEventListener('keydown', onKey);
 
+  shieldPointer(root);
   watchUnmount(root, () => {
     window.removeEventListener('keydown', onKey);
     window.clearTimeout(slowTimer);

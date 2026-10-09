@@ -8,7 +8,8 @@ import { SLOTS } from './Game';
 import type { Vec2 } from './types';
 
 const POLICE_COUNT = 6;
-let respawnAt = 0;
+/** Prochaine relève de police, par partie (plusieurs salons peuvent tourner en même temps). */
+const respawnAt = new WeakMap<Game, number>();
 
 function patrolRoute(g: Game, i: number): Vec2[] {
   // circuits dans les beaux quartiers, avec un détour par les autres
@@ -43,8 +44,8 @@ export function updatePolice(g: Game, dt: number): void {
   if (g.tick % 10 !== 3) return;
   let alive = 0;
   for (const e of g.ents.values()) if (e.role === 'police' && e.alive) alive++;
-  if (alive < POLICE_COUNT && g.time > respawnAt) {
-    respawnAt = g.time + 50;
+  if (alive < POLICE_COUNT && g.time > (respawnAt.get(g) ?? 0)) {
+    respawnAt.set(g, g.time + 50);
     spawnPolice(g, 1);
   }
   // armes selon le niveau de recherche des parrains poursuivis

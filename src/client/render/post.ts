@@ -22,10 +22,10 @@ vec3 pick(vec2 uv) {
   vec3 c = texture2D(tSrc, uv).rgb;
   float br = max(c.r, max(c.g, c.b));
   // genou doux : seules les zones presque saturées contribuent
-  float w = smoothstep(uThreshold, uThreshold + 0.22, br);
+  float w = smoothstep(uThreshold, uThreshold + 0.12, br);
   // les lumières chaudes (lampes, feu) brillent davantage que le ciel gris
   float warm = clamp((c.r - c.b) * 2.0, 0.0, 1.0);
-  return c * w * (0.55 + 0.45 * warm);
+  return c * w * (0.35 + 0.65 * warm);
 }
 void main() {
   vec2 o = uTexel;
@@ -72,7 +72,7 @@ varying vec2 vUv;
 void main() {
   vec3 b = texture2D(tSrc, vUv).rgb * uStrength;
   // courbe douce pour éviter de brûler les blancs
-  b = b / (1.0 + b * 0.6);
+  b = b / (1.0 + b);
   gl_FragColor = vec4(b, 1.0);
 }`;
 
@@ -188,19 +188,20 @@ export class PostFX {
     try {
       r.copyFramebufferToTexture(this.frame);
       r.autoClear = false;
-      this.brightMat.uniforms.uThreshold.value = 0.86 - 0.2 * night;
+      this.brightMat.uniforms.uThreshold.value = 0.9 - 0.12 * night;
       this.pass(this.brightMat, this.frame, this.size.x, this.size.y, this.rts[0]);
       for (let i = 1; i < LEVELS; i++) {
         const src = this.rts[i - 1];
         this.pass(this.downMat, src.texture, src.width, src.height, this.rts[i]);
       }
-      // remontée : chaque niveau reçoit le niveau inférieur flouté (addition)
+      // remontée : chaque niveau reçoit le niveau inférieur flouté (addition), avec un
+      // poids décroissant pour que le halo reste local autour des sources
       for (let i = LEVELS - 1; i > 0; i--) {
         const src = this.rts[i];
-        this.upMat.uniforms.uWeight.value = 1;
+        this.upMat.uniforms.uWeight.value = 0.55;
         this.pass(this.upMat, src.texture, src.width, src.height, this.rts[i - 1]);
       }
-      this.compMat.uniforms.uStrength.value = this.strength * (0.35 + 0.75 * night);
+      this.compMat.uniforms.uStrength.value = this.strength * (0.22 + 0.38 * night);
       this.pass(this.compMat, this.rts[0].texture, this.rts[0].width, this.rts[0].height, null);
     } catch (e) {
       // matériel incapable (copie du tampon refusée…) : on désactive le halo

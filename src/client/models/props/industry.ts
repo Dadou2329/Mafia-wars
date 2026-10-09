@@ -2,7 +2,7 @@
 // établi, crochets de boucher, étagère du boulanger.
 // Résolution 1/16 m, origine au centre de la base, l'avant regarde vers +Z.
 
-import { C, P, SLOT, VoxelModel, shade, mix, grain, grainBox, blockJitter, speckle, colors, pix, curve, line6, wheel, discXY, hash3, rng, framePanel, drawer, rotate180 } from './helpers';
+import { C, P, VoxelModel, shade, grainBox, line6, wheel, hash3, rng, rotate180 } from './helpers';
 
 const I = C.iron;
 const IH = C.ironHi;
@@ -235,17 +235,19 @@ export function meatRack(variant = 0): VoxelModel {
   const meat = C.meat;
   const fat = C.fat;
   if (v === 0) {
-    // quartier de bœuf : côtes alternant chair et gras
+    // quartier de bœuf : chair rouge, côtes nacrées, couverture de gras sur le dos
     hook(6, 28);
     for (let y = 6; y < 28; y++) {
-      const w = y > 22 ? 3 + (27 - y) * 0.3 : y < 11 ? 2 + (y - 6) * 0.5 : 4;
+      const w = y > 23 ? 2 + (27 - y) * 0.5 : y < 11 ? 2 + (y - 6) * 0.45 : 4.2 - Math.abs(y - 17) * 0.05;
       for (let x = Math.round(6 - w); x < Math.round(6 + w); x++)
         for (let z = 1; z < 7; z++) {
-          if (Math.abs(z + 0.5 - 4) > 2.5 + (x > 5 ? 0 : -0.5)) continue;
-          const marb = hash3(Math.floor(x / 2), Math.floor(y / 2), z, 4);
-          let c = y % 4 === 0 && marb < 0.7 ? fat : marb < 0.15 ? shade(fat, 0.9) : meat;
-          if (z === 1 || x === Math.round(6 - w)) c = shade(fat, 0.95);
-          if (c === meat && hash3(x, y, z, 3) < 0.15) c = shade(meat, 0.82);
+          if (Math.abs(z + 0.5 - 4) > 2.5) continue;
+          const edge = x === Math.round(6 - w) || x === Math.round(6 + w) - 1;
+          let c = meat;
+          if (z === 1 || (edge && z < 4)) c = shade(fat, 0.95);
+          else if (z === 6 && y > 12 && y < 24 && y % 3 === 0) c = fat;
+          else if (hash3(x, y, z, 3) < 0.1) c = shade(meat, 0.8);
+          else if (hash3(x, y, z, 4) < 0.06) c = shade(fat, 1.0);
           m.set(x, y, z, c);
         }
     }
@@ -343,14 +345,3 @@ function z0(x: number): number {
   return x % 2 ? 2 : 4;
 }
 
-void SLOT;
-void mix;
-void grain;
-void blockJitter;
-void speckle;
-void colors;
-void pix;
-void curve;
-void discXY;
-void framePanel;
-void drawer;

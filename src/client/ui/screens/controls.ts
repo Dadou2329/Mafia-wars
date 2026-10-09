@@ -5,7 +5,7 @@ import type { AppApi } from '../../appApi';
 import { ACTIONS, RESERVED, conflicts, defaultBindings, keyLabel, learnKey, type ActionDef, type ActionId } from '../../input/bindings';
 import { saveSettings, settings } from '../../settings';
 import { clear, h } from '../dom';
-import { button, choose, closeOnEscape, fr, icon, watchUnmount } from './menu';
+import { button, choose, closeOnEscape, fr, icon, shieldPointer, watchUnmount } from './menu';
 
 const GROUPS: { group: ActionDef['group']; col: number }[] = [
   { group: 'Déplacements', col: 0 },
@@ -71,7 +71,7 @@ export function controlsPanel(app: AppApi, opts: { onClose(): void }): HTMLEleme
       return wrap;
     }
     const content = waiting
-      ? h('span', { class: 'mw-bind-wait' }, 'Appuyez sur une touche…')
+      ? h('span', { class: 'mw-bind-wait' }, 'Appuyez…')
       : code
         ? h('span', { class: 'keycap' }, keyLabel(code))
         : i === 0
@@ -220,7 +220,8 @@ export function controlsPanel(app: AppApi, opts: { onClose(): void }): HTMLEleme
   // le jeu (et le raccourci Échap) ne reçoit rien pendant la saisie.
   let keyUpUntil = 0;
   let keyUpCode = '';
-  let clickUntil = 0;
+  /** Bouton de souris capturé : on avale le clic (ou menu contextuel) qui suit, une seule fois. */
+  let followUp: { button: number; until: number } | null = null;
   let wheelUntil = 0;
 
   const onKey = (e: KeyboardEvent): void => {
@@ -255,7 +256,7 @@ export function controlsPanel(app: AppApi, opts: { onClose(): void }): HTMLEleme
     if (!capture) return;
     e.preventDefault();
     e.stopImmediatePropagation();
-    clickUntil = performance.now() + 700;
+    followUp = { button: e.button, until: performance.now() + 1500 };
     if (e.target instanceof Element && e.target.closest('.mw-capture-cancel')) {
       cancelCapture();
       return;
@@ -274,14 +275,20 @@ export function controlsPanel(app: AppApi, opts: { onClose(): void }): HTMLEleme
     void assign(e.deltaY < 0 ? 'WheelUp' : 'WheelDown');
   };
   const swallowClick = (e: MouseEvent): void => {
-    // le clic (ou menu contextuel) qui suit un bouton de souris capturé ne doit rien déclencher
-    if (performance.now() < clickUntil) {
-      e.preventDefault();
-      e.stopImmediatePropagation();
+    // le clic, le menu contextuel ou la navigation (boutons 4 et 5) qui suivent le bouton
+    // capturé ne doivent rien déclencher
+    if (!followUp || e.button !== followUp.button) return;
+    if (performance.now() > followUp.until) {
+      followUp = null;
+      return;
     }
+    e.preventDefault();
+    e.stopImmediatePropagation();
+    if (e.type === 'click' || e.type === 'auxclick') followUp = null;
   };
 
   window.addEventListener('keyup', onKeyUp, true);
+  window.addEventListener('mouseup', swallowClick, true);
   window.addEventListener('click', swallowClick, true);
   window.addEventListener('auxclick', swallowClick, true);
   window.addEventListener('contextmenu', swallowClick, true);
@@ -315,6 +322,7 @@ export function controlsPanel(app: AppApi, opts: { onClose(): void }): HTMLEleme
     stopCapture();
     window.clearTimeout(flashTimer);
     window.removeEventListener('keyup', onKeyUp, true);
+    window.removeEventListener('mouseup', swallowClick, true);
     window.removeEventListener('click', swallowClick, true);
     window.removeEventListener('auxclick', swallowClick, true);
     window.removeEventListener('contextmenu', swallowClick, true);
@@ -352,6 +360,7 @@ export function controlsPanel(app: AppApi, opts: { onClose(): void }): HTMLEleme
     app.click();
     opts.onClose();
   });
+  shieldPointer(panel, true);
   render();
   return panel;
 }

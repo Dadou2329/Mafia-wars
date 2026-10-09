@@ -5,7 +5,7 @@ import type { MatchStats, Slot } from '../../../shared/protocol';
 import { BOSS_NAME, MAFIA_NAME } from '../../../shared/constants';
 import { formatMoney } from '../../../shared/util';
 import { h } from '../dom';
-import { BRAND, TITLE, button, fr, icon } from './menu';
+import { BRAND, TITLE, button, fr, icon, shieldPointer } from './menu';
 import { currentPortraits } from './settings';
 
 const SLOTS: Slot[] = ['dadou', 'even'];
@@ -65,7 +65,7 @@ export function victoryScreen(
         'figure',
         { class: `mw-hero-fig mw-hero-fig--${s}` },
         h('img', { class: 'mw-hero-emblem', src: BRAND.emblem[s], alt: '', 'aria-hidden': 'true', draggable: false }),
-        img,
+        h('div', { class: 'mw-hero-frame' }, img),
         h('figcaption', { class: 'mw-hero-plate' }, h('span', { class: 'mw-hero-name' }, BOSS_NAME[s]), h('span', { class: 'mw-hero-mafia' }, MAFIA_NAME[s])),
       );
     }),
@@ -151,6 +151,7 @@ export function victoryScreen(
     { class: `screen mw-victory mw-victory--${theme}`, 'data-outcome': outcome },
     h('div', { class: 'mw-victory-bg', 'aria-hidden': 'true' }),
     h('div', { class: 'mw-rays', 'aria-hidden': 'true' }),
+    h('div', { class: 'mw-victory-vignette', 'aria-hidden': 'true' }),
     outcome === 'win' ? leaves(34) : null,
     h(
       'div',
@@ -177,6 +178,7 @@ export function victoryScreen(
     ),
   );
   paintVotes();
+  shieldPointer(el);
 
   return {
     el,

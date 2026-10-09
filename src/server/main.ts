@@ -1,6 +1,7 @@
 // Serveur de jeu : fichiers statiques du client + Socket.IO (salons et parties).
 
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
+import { existsSync } from 'node:fs';
 import { readFile, stat } from 'node:fs/promises';
 import { networkInterfaces } from 'node:os';
 import { extname, join, normalize, resolve } from 'node:path';
@@ -12,8 +13,11 @@ import { getWorld } from './world';
 const PORT = Number(process.env.PORT ?? 3000);
 const HOST = process.env.HOST ?? '0.0.0.0';
 const here = fileURLToPath(new URL('.', import.meta.url));
-// en production : dist/server/main.js → dist/client
-const CLIENT_DIR = resolve(process.env.CLIENT_DIR ?? join(here, '..', 'client'));
+// en production : dist/server/main.js → dist/client ; lancé depuis les sources (tsx) :
+// on sert dist/client s'il a été compilé (npm run build:client)
+const CLIENT_DIR = resolve(
+  process.env.CLIENT_DIR ?? (existsSync(join(here, '..', 'client', 'index.html')) ? join(here, '..', 'client') : join(here, '..', '..', 'dist', 'client')),
+);
 
 const MIME: Record<string, string> = {
   '.html': 'text/html; charset=utf-8',
@@ -80,6 +84,10 @@ const sessions = new Map<string, Session>();
 function newId(): string {
   return Math.random().toString(36).slice(2, 10) + Math.random().toString(36).slice(2, 10);
 }
+
+// filet de sécurité : une erreur dans un gestionnaire ne doit pas couper toutes les parties
+process.on('uncaughtException', (e) => console.error('[serveur] erreur non rattrapée :', e));
+process.on('unhandledRejection', (e) => console.error('[serveur] promesse rejetée :', e));
 
 io.on('connection', (socket) => {
   let session: Session | null = null;

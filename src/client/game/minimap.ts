@@ -2,7 +2,7 @@
 
 import { CharKind } from '../../shared/characters';
 import { BUILDINGS, Faction } from '../../shared/city/plan';
-import type { PrivateState, PublicState, Slot } from '../../shared/protocol';
+import type { GameEvent, PrivateState, PublicState, Slot } from '../../shared/protocol';
 import { MAP_SCALE, type CityMap } from './cityMap';
 import type { EntityStore } from './entities';
 
@@ -22,6 +22,7 @@ export function drawMinimap(
   priv: PrivateState | null,
   me: Slot,
   selfId: number,
+  event: Extract<GameEvent, { t: 'event' }> | null = null,
 ): void {
   const c = canvas.getContext('2d')!;
   const W = canvas.width;
@@ -105,7 +106,44 @@ export function drawMinimap(
       c.fill();
     }
   }
+  // cargaison de contrebande / descente de police
+  if (event && (event.kind === 'contraband' || event.kind === 'raid')) {
+    const t = Date.now() / 1000;
+    c.strokeStyle = event.kind === 'raid' ? '#7fa8ff' : '#ffc94a';
+    c.lineWidth = 3 / s;
+    c.beginPath();
+    c.arc(event.x * MAP_SCALE, event.z * MAP_SCALE, (event.kind === 'raid' ? 14 : 3 + (t % 1) * 3) * MAP_SCALE, 0, Math.PI * 2);
+    c.stroke();
+    c.fillStyle = event.kind === 'raid' ? '#7fa8ff' : '#ffc94a';
+    c.font = `${30}px serif`;
+    c.textAlign = 'center';
+    c.fillText(event.kind === 'raid' ? '⚑' : '£', event.x * MAP_SCALE, event.z * MAP_SCALE + 10);
+  }
   c.restore();
+  // repère de la cargaison hors de la mini-carte : flèche au bord
+  if (event && event.kind === 'contraband') {
+    const dx = event.x - px;
+    const dz = event.z - pz;
+    const d = Math.hypot(dx, dz);
+    if (d > radiusM * 0.9) {
+      const r = W / 2 - 16;
+      c.save();
+      c.translate(W / 2 + (dx / d) * r, H / 2 + (dz / d) * r);
+      c.fillStyle = '#ffc94a';
+      c.strokeStyle = '#000';
+      c.lineWidth = 2;
+      c.beginPath();
+      c.arc(0, 0, 11, 0, Math.PI * 2);
+      c.fill();
+      c.stroke();
+      c.fillStyle = '#2a1a0c';
+      c.font = "700 15px 'Cinzel', serif";
+      c.textAlign = 'center';
+      c.textBaseline = 'middle';
+      c.fillText('£', 0, 1);
+      c.restore();
+    }
+  }
   // flèche du joueur
   c.save();
   c.translate(W / 2, H / 2);

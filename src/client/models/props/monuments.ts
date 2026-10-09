@@ -1,7 +1,7 @@
 // Monuments : statue d'homme d'État et statue équestre, bronze patiné sur piédestal.
 // Résolution 1/16 m, origine au centre de la base, l'avant regarde vers +Z.
 
-import { C, P, VoxelModel, shade, mix, hash3, blockJitter, colors, pix } from './helpers';
+import { P, VoxelModel, shade, mix, hash3, colors } from './helpers';
 
 const BR = 0x483c2b;
 const BRD = 0x30281e;
@@ -47,8 +47,9 @@ function ashlar(m: VoxelModel, seed: number, isStone: (c: number) => boolean): v
 function pedestal(m: VoxelModel, x0: number, z0: number, x1: number, z1: number, dieH: number): number {
   const S = P.portland;
   const Sd = P.portlandDark;
-  m.box(x0, 0, z0, x1, 2, z1, P.graniteDark);
-  m.box(x0 + 1, 2, z0 + 1, x1 - 1, 4, z1 - 1, P.granite);
+  m.box(x0, 0, z0, x1, 4, z1, P.granite);
+  m.box(x0, 0, z0, x1, 1, z1, P.graniteDark);
+  m.box(x0, 3, z0, x1, 4, z1, P.graniteLight);
   m.box(x0 + 3, 4, z0 + 3, x1 - 3, 6, z1 - 3, Sd);
   let y = 6;
   m.box(x0 + 4, y, z0 + 4, x1 - 4, y + dieH, z1 - 4, S);
@@ -85,50 +86,77 @@ export function statue(): VoxelModel {
   const Y = top;
   m.box(7, Y, 7, 19, Y + 1, 19, BRD);
   const b = Y + 1;
-  // chaussures (pointes vers +Z)
-  m.box(10, b, 12, 12, b + 1, 16, BRD);
-  m.box(14, b, 11, 16, b + 1, 15, BRD);
-  // jambes du pantalon
-  m.box(10, b + 1, 12, 13, b + 13, 15, BR);
-  m.box(13, b + 1, 11, 16, b + 13, 14, BR);
-  m.box(12, b + 1, 12, 14, b + 6, 14, -1);
-  // redingote : pans jusqu'au genou, ouverte devant
+  const sweep = (pts: [number, number, number][], x0: number, x1: number, c = BR) => {
+    for (let i = 0; i + 1 < pts.length; i++) {
+      const [ay, az, ah] = pts[i];
+      const [by2, bz, bh] = pts[i + 1];
+      const n = Math.ceil(Math.hypot(by2 - ay, bz - az) * 2);
+      for (let k = 0; k <= n; k++) {
+        const t = k / n;
+        const y = ay + (by2 - ay) * t;
+        const z = az + (bz - az) * t;
+        const h = ah + (bh - ah) * t;
+        m.box(x0, b + y - h, z - 1, x1, b + y + h, z + 1, c);
+      }
+    }
+  };
+  // souliers (pointes vers +Z) et jambes du pantalon, la droite (-X) avancée
+  m.box(10, b, 13, 12.5, b + 1, 17, BRD);
+  m.box(13.5, b, 12, 16, b + 1, 16, BRD);
+  m.box(10, b + 1, 13, 12.5, b + 12, 16, BR);
+  m.box(13.5, b + 1, 11.5, 16, b + 12, 14.5, BR);
+  // redingote : pans évasés jusqu'au genou, ouverts devant
   for (let y = b + 8; y < b + 19; y++) {
-    const flare = y < b + 12 ? 1 : 0;
+    const flare = y < b + 11 ? 1 : 0;
     m.box(9 - flare, y, 10 - flare, 17 + flare, y + 1, 16, BR);
     if (y < b + 15) m.box(12, y, 15, 14, y + 1, 16, -1);
   }
-  // pli central dans le dos
   m.box(12, b + 8, 9, 14, b + 18, 10, BRD);
-  // torse et gilet
+  // torse, gilet boutonné, revers
   m.box(9, b + 19, 10, 17, b + 28, 15, BR);
-  m.box(12, b + 19, 15, 14, b + 26, 16, mix(BR, BRL, 0.35));
+  m.box(12, b + 19, 15, 14, b + 26, 16, mix(BR, BRL, 0.3));
   for (const y of [b + 20, b + 22, b + 24]) m.set(12, y, 16, BRL);
-  m.box(10, b + 26, 15, 16, b + 28, 16, BR);
-  // cape drapée sur les épaules et dans le dos
-  m.box(8, b + 14, 8, 18, b + 29, 10, BR);
-  m.box(7, b + 22, 9, 19, b + 29, 11, BR);
+  m.box(10, b + 24, 15, 12, b + 28, 16, BRD).box(14, b + 24, 15, 16, b + 28, 16, BRD);
   // épaules
-  m.box(7, b + 27, 9, 19, b + 29, 15, BR);
-  // bras gauche (côté +X) le long du corps tenant un rouleau
+  m.box(8, b + 27, 9, 18, b + 29, 15, BR);
+  m.box(7, b + 26, 10, 19, b + 27, 14, BR);
+  // cape drapée dans le dos et sur l'épaule gauche
+  for (let y = b + 10; y < b + 29; y++) {
+    const t = (b + 29 - y) / 19;
+    const x0 = Math.round(9 - t * 1.5);
+    const x1 = Math.round(17 + t * 2);
+    const zb = Math.round(9 - t * 1.2);
+    m.box(x0, y, zb, x1, y + 1, zb + 2, BR);
+    for (let x = x0; x < x1; x += 3) m.set(x, y, zb, mix(BR, BRD, 0.5));
+  }
+  m.box(17, b + 14, 9, 19, b + 29, 12, BR);
+  // bras gauche (+X) le long du corps, tenant un rouleau
   m.box(17, b + 16, 11, 19, b + 27, 14, BR);
-  m.box(17, b + 14, 11, 19, b + 16, 14, P.bronzeLight);
-  m.box(17, b + 13, 14, 19, b + 14, 18, BRL);
-  m.box(17, b + 13, 10, 19, b + 14, 11, BRL);
-  // bras droit (côté -X) tendu vers l'avant, geste d'orateur
+  m.box(17, b + 14, 11, 19, b + 16, 14, BRL);
+  m.box(17, b + 13, 10, 19, b + 14, 18, BRL);
+  m.set(17, b + 13, 17, BRD).set(18, b + 13, 17, BRD);
+  // bras droit (-X) tendu vers la foule, main ouverte
   m.box(7, b + 21, 11, 9, b + 27, 14, BR);
-  for (let i = 0; i <= 6; i++) m.box(7, b + 21 + i * 0.6, 13 + i, 9, b + 23 + i * 0.6, 15 + i, BR);
-  m.box(7, b + 24, 19, 9, b + 26, 21, BRL);
-  m.set(7, b + 26, 20, BRL);
-  // col, tête, favoris, cheveux
+  sweep(
+    [
+      [22, 12.5, 1],
+      [24.5, 18.5, 1],
+    ],
+    7,
+    9,
+  );
+  m.box(7, b + 24, 19, 9, b + 27, 21, BRL);
+  m.set(7, b + 27, 20, BRL);
+  // cou, tête : cheveux, favoris, barbe, nez, sourcils
   m.box(12, b + 29, 12, 14, b + 30, 14, BR);
   m.box(10, b + 28, 11, 16, b + 30, 15, BR);
   m.box(11, b + 30, 11, 15, b + 36, 15, BR);
+  m.box(11, b + 34, 11, 15, b + 37, 14, BRD);
+  m.box(11, b + 33, 11, 12, b + 35, 13, BRD).box(14, b + 33, 11, 15, b + 35, 13, BRD);
+  m.box(11, b + 30, 13, 15, b + 32, 15.5, BRD);
+  m.box(12, b + 29, 14, 14, b + 30, 15, BRD);
   m.box(12, b + 32, 15, 14, b + 33, 16, BRL);
-  m.box(11, b + 30, 13, 12, b + 33, 15, BRD).box(14, b + 30, 13, 15, b + 33, 15, BRD);
-  m.box(12, b + 30, 14, 14, b + 31, 15, BRD);
-  m.box(11, b + 35, 11, 15, b + 37, 14, BRD);
-  m.box(10, b + 33, 11, 11, b + 35, 14, BRD).box(15, b + 33, 11, 16, b + 35, 14, BRD);
+  m.set(11, b + 34, 14, BRD).set(14, b + 34, 14, BRD);
   patina(m, 11, colors(BR, BRD, BRL));
   ashlar(m, 12, colors(P.portland, P.portlandDark, shade(P.portland, 1.06), shade(P.portland, 1.04), shade(P.portland, 1.05), P.granite, P.graniteDark));
   m.setOrigin(13, 0, 13);
@@ -331,5 +359,3 @@ export function statueHorse(): VoxelModel {
   return m;
 }
 
-void C;
-void pix;

@@ -377,8 +377,9 @@ export function furnishRoom(fu: Furnisher, r: Room, buildingType: string, varian
       fu.marks.desk = { lx: cx, lz: dz, yaw: Math.PI };
       fu.marks.deskSeat = { lx: cx, lz: dz - 4.2 };
       fu.reserve(cx - 6, dz - 7, cx + 6, r.z1);
-      fu.p('ARMCHAIR', cx - 3, dz - 6.5, 0.3, 0, true);
-      fu.p('ARMCHAIR', cx + 3, dz - 6.5, -0.3, 0, true);
+      // fauteuils des visiteurs, assez écartés pour laisser la place devant le bureau
+      fu.p('ARMCHAIR', cx - 5.5, dz - 7.5, 0.35, 0, true);
+      fu.p('ARMCHAIR', cx + 5.5, dz - 7.5, -0.35, 0, true);
       fu.lineWall(r, 'BOOKSHELF', 'left', 5.5, 2);
       fu.againstWall(r, 'SAFE', 'right', r.z1 - 4);
       fu.againstWall(r, 'GLOBE', 'right', r.z0 + 4);
@@ -631,8 +632,8 @@ export function furnishRoom(fu: Furnisher, r: Room, buildingType: string, varian
       // allée centrale, bancs de part et d'autre
       fu.rug(cx - 3, r.z0 + 2, cx + 3, r.z1 - 8, M.CARPET_RED);
       for (let z = r.z0 + 6; z < r.z1 - 14; z += 5) {
-        fu.p('PEW', cx - 9, z, Math.PI);
-        fu.p('PEW', cx + 9, z, Math.PI);
+        fu.p('PEW', cx - 9, z, 0);
+        fu.p('PEW', cx + 9, z, 0);
       }
       // chœur surélevé
       fu.f.fill(r.x0, fu.lv.floorTop, r.z1 - 9, r.x1, fu.lv.floorTop + 1, r.z1, M.MARBLE);
@@ -698,7 +699,7 @@ export function furnishRoom(fu: Furnisher, r: Room, buildingType: string, varian
     }
     case 'police_front': {
       const z = r.z0 + Math.round(d * 0.55);
-      fu.p('POLICE_DESK', cx + 3, z, 0, 0);
+      fu.p('POLICE_DESK', cx + 3, z, Math.PI, 0);
       fu.lineWall(r, 'BENCH', 'left', 9, 3);
       fu.lineWall(r, 'POSTER_BOARD', 'right', 8, 3);
       fu.roomLights(r, 'HANGING_LAMP', true);

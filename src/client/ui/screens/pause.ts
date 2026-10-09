@@ -2,7 +2,7 @@
 
 import type { AppApi } from '../../appApi';
 import { h } from '../dom';
-import { BRAND, TITLE, button, choose, fr, icon } from './menu';
+import { BRAND, TITLE, button, choose, fr, icon, shieldPointer } from './menu';
 
 export function pauseMenu(
   app: AppApi,
@@ -45,6 +45,7 @@ export function pauseMenu(
     code ? h('div', { class: 'mw-pause-foot' }, fr(`Code de la partie : ${code}`)) : null,
   );
   el.appendChild(box);
+  shieldPointer(el);
 
   // flèches haut/bas pour parcourir le menu
   box.addEventListener('keydown', (e) => {

@@ -1,7 +1,7 @@
 // Accessoires des lieux : pub, casino, église, théâtre, commissariat, caserne, docks.
 // Résolution 1/16 m, origine au centre de la base, l'avant regarde vers +Z.
 
-import { C, P, SLOT, VoxelModel, shade, mix, grain, grainBox, blockJitter, speckle, colors, rbox, pix, curve, line6, wheel, discXY, hash3, rng, framePanel, drawer, turnedLeg, text } from './helpers';
+import { C, P, SLOT, VoxelModel, shade, mix, grain, grainBox, blockJitter, colors, rbox, pix, line6, wheel, discXY, hash3, rng, framePanel, turnedLeg, text } from './helpers';
 
 const I = C.iron;
 const CHIPS = [0xb02020, 0xf0ece2, 0x1d3a8a, 0x161514, C.gold];
@@ -794,11 +794,10 @@ export function chest(variant = 0): VoxelModel {
     m.set(x, 4, 3, P.hemp).set(x, 4, 5, P.hemp);
   }
   if (v === 1) {
-    // panneau peint : trois-mâts sur la mer
-    pix(m, ['cccccc', 'ccwcwc', 'cwwcwc', 'ccnnnc', 'bbbbbb'], { c: 0xb4d0e4, w: C.white, n: 0x5e3e22, b: 0x284a6a }, 'xy', 5, 6, 8);
-    m.box(4, 1, 8, 12, 7, 9, P.cream);
-    pix(m, ['cccccccc', 'ccwcwccc', 'cwwcwwcc', 'cnnnnnnc', 'bbbbbbbb'], { c: 0xb4d0e4, w: C.white, n: 0x5e3e22, b: 0x284a6a }, 'xy', 4, 6, 9);
-    m.box(7, 5, 9, 9, 9, 10, I);
+    // ancre blanche peinte sur le couvercle, liseré rouge
+    pix(m, ['..w..', '.www.', '..w..', 'w.w.w', '.www.'], { w: C.white }, 'xz', 6, 2, 9);
+    m.box(1, 7, 0, 15, 8, 9, C.red);
+    for (const x of [2, 12]) m.box(x, 7, 0, x + 2, 8, 9, I);
   }
   m.setOrigin(8, 0, 5);
   return grain(m, 'x', 0.07, 660 + v, (c) => c === wood);
@@ -808,26 +807,35 @@ export function chest(variant = 0): VoxelModel {
 export function shipWheel(): VoxelModel {
   const m = new VoxelModel(19, 24, 6);
   const teak = P.teak;
+  const dark = shade(teak, 0.75);
   const cx = 9.5;
-  const cy = 14;
+  const cy = 14.5;
   // piédestal
-  m.box(6, 0, 0, 13, 2, 5, shade(teak, 0.8));
-  m.box(7, 2, 1, 12, 12, 4, teak);
+  m.box(6, 0, 0, 13, 2, 5, dark);
+  m.box(7, 2, 1, 12, 13, 4, teak);
   m.box(6, 12, 0, 13, 13, 5, shade(teak, 1.15));
   m.box(8, 13, 1, 11, 15, 4, teak);
   m.box(7, 6, 4, 12, 7, 5, C.brass);
-  // roue
-  wheel(m, 'z', cx, cy, 4, 5, 7.6, { spokes: 8, wood: teak, hub: C.brass, hubR: 1.8, rimW: 1.4, phase: Math.PI / 8 });
+  // jante
+  for (let x = 0; x < 19; x++)
+    for (let y = 5; y < 24; y++) {
+      const d = Math.hypot(x + 0.5 - cx, y + 0.5 - cy);
+      if (d >= 5.4 && d <= 6.9) m.set(x, y, 4, d > 6.2 ? shade(teak, 1.12) : teak);
+    }
+  // rayons prolongés en poignées tournées
   for (let k = 0; k < 8; k++) {
     const a = Math.PI / 8 + (k / 8) * Math.PI * 2;
-    for (let r = 7.6; r < 9.6; r += 0.5) m.set(cx + Math.cos(a) * r - 0.5, cy + Math.sin(a) * r - 0.5, 4, r > 9 ? shade(teak, 1.25) : teak);
+    for (let r = 1.4; r <= 9.2; r += 0.35) {
+      const c = r > 6.9 ? (r > 8.4 ? shade(teak, 1.3) : teak) : r < 5.4 ? dark : teak;
+      m.set(cx + Math.cos(a) * r - 0.5, cy + Math.sin(a) * r - 0.5, 4, c);
+    }
   }
-  // incrustations de laiton sur la jante
-  for (let k = 0; k < 8; k++) {
-    const a = (k / 8) * Math.PI * 2;
-    m.set(cx + Math.cos(a) * 6.9 - 0.5, cy + Math.sin(a) * 6.9 - 0.5, 5, C.brass);
-  }
-  m.box(9, 13, 4, 11, 15, 6, P.brassLight);
+  // moyeu de laiton
+  for (let x = 7; x < 12; x++)
+    for (let y = 12; y < 17; y++) {
+      const d = Math.hypot(x + 0.5 - cx, y + 0.5 - cy);
+      if (d <= 1.8) m.box(x, y, 4, x + 1, y + 1, 6, d < 0.8 ? P.brassLight : C.brass);
+    }
   m.setOrigin(9.5, 0, 3);
   return m;
 }
@@ -872,6 +880,3 @@ export function mapStand(): VoxelModel {
   return m;
 }
 
-void speckle;
-void curve;
-void drawer;

@@ -7,7 +7,7 @@ import { keyLabel } from '../../input/bindings';
 import { resetSettings, saveSettings, settings, type Quality, type Settings } from '../../settings';
 import { renderPortraits } from '../portraits';
 import { clear, h } from '../dom';
-import { BRAND, button, choose, closeOnEscape, fr, icon, inMatch, pct, withSounds, type IconName } from './menu';
+import { BRAND, button, choose, closeOnEscape, fr, icon, inMatch, pct, shieldPointer, withSounds, type IconName } from './menu';
 
 // ============================================================================ portraits à jour
 // Les portraits de l'application sont rendus au démarrage. Si la tenue d'un parrain change
@@ -566,6 +566,7 @@ export function settingsPanel(app: AppApi, opts: { inGame: boolean; onClose(): v
     app.click();
     opts.onClose();
   });
+  shieldPointer(panel, true);
   show(lastTab);
   return panel;
 }

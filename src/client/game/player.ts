@@ -24,6 +24,8 @@ export class PlayerController {
   bodyYaw = 0;
   onGround = false;
   crouch = false;
+  /** Accroupi d'office (plafond bas) : on se relève tout seul dès qu'il y a la place. */
+  private forcedCrouch = false;
   sprint = false;
   aiming = false;
   firstPerson = !settings.thirdPerson;
@@ -54,6 +56,34 @@ export class PlayerController {
     this.yaw = yaw;
     this.bodyYaw = yaw;
     this.pitch = 0;
+    this.crouch = false;
+    this.forcedCrouch = false;
+    this.unstick();
+  }
+
+  /**
+   * Si le joueur chevauche un obstacle (point d'apparition encombré, meuble…), on le
+   * dégage vers l'emplacement libre le plus proche (recherche en spirale, 1,5 m au plus).
+   */
+  unstick(): boolean {
+    const h = this.crouch ? HEIGHT_CROUCH : HEIGHT;
+    if (!this.collides(this.pos.x, this.pos.y, this.pos.z, h)) return false;
+    const { x, y, z } = this.pos;
+    for (let r = 0.1; r <= 1.5; r += 0.1) {
+      const n = Math.max(8, Math.round((r * Math.PI * 2) / 0.1));
+      for (let k = 0; k < n; k++) {
+        const a = (k / n) * Math.PI * 2;
+        const nx = x + Math.cos(a) * r;
+        const nz = z + Math.sin(a) * r;
+        for (const dy of [0, 0.25, -0.25]) {
+          if (!this.collides(nx, y + dy, nz, h)) {
+            this.pos.set(nx, y + dy, nz);
+            return true;
+          }
+        }
+      }
+    }
+    return false;
   }
 
   private solidVoxel(vx: number, vy: number, vz: number): boolean {
@@ -106,7 +136,10 @@ export class PlayerController {
       return;
     }
     this.aiming = input.is('aim');
-    if (input.hit('crouch')) this.crouch = !this.crouch;
+    if (input.hit('crouch')) {
+      this.crouch = !this.crouch;
+      this.forcedCrouch = false;
+    }
     // ----- déplacement voulu
     let fx = 0;
     let fz = 0;
@@ -150,6 +183,8 @@ export class PlayerController {
 
   private integrate(dt: number, wx: number, wz: number, jump: boolean): void {
     const h = this.crouch ? HEIGHT_CROUCH : HEIGHT;
+    // coincé dans le décor (apparition, porte, accessoire) : on se dégage d'abord
+    if (this.collides(this.pos.x, this.pos.y, this.pos.z, h) && (!this.crouch || this.collides(this.pos.x, this.pos.y, this.pos.z, HEIGHT_CROUCH))) this.unstick();
     const accel = this.onGround ? 42 : 9;
     this.vel.x += clamp(wx - this.vel.x, -accel * dt, accel * dt);
     this.vel.z += clamp(wz - this.vel.z, -accel * dt, accel * dt);
@@ -194,7 +229,13 @@ export class PlayerController {
       }
     }
     // pour se relever, il faut de la place
-    if (!this.crouch && this.collides(this.pos.x, this.pos.y, this.pos.z, HEIGHT)) this.crouch = true;
+    if (!this.crouch && this.collides(this.pos.x, this.pos.y, this.pos.z, HEIGHT)) {
+      this.crouch = true;
+      this.forcedCrouch = true;
+    } else if (this.forcedCrouch && !this.collides(this.pos.x, this.pos.y, this.pos.z, HEIGHT)) {
+      this.crouch = false;
+      this.forcedCrouch = false;
+    }
   }
 
   private moveAxis(dx: number, dz: number, h: number): void {

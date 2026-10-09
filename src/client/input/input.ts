@@ -10,7 +10,9 @@ export class Input {
   mouseDX = 0;
   mouseDY = 0;
   /** Les entrées de jeu sont ignorées (menus, chat…). */
-  blocked = false;
+  blocked = true;
+  /** Le pointeur peut être capturé (uniquement pendant une partie). */
+  lockEnabled = false;
   locked = false;
   private target: HTMLElement;
   /** Rappel quand le pointeur est relâché (ex. touche Échap). */
@@ -45,7 +47,7 @@ export class Input {
       const c = `Mouse${e.button}`;
       if (!this.down.has(c)) this.pressed.add(c);
       this.down.add(c);
-      if (!this.locked) this.requestLock();
+      if (!this.locked && this.lockEnabled) this.requestLock();
     });
     window.addEventListener('mouseup', (e) => {
       const c = `Mouse${e.button}`;
@@ -80,6 +82,7 @@ export class Input {
   }
 
   requestLock(): void {
+    if (!this.lockEnabled) return;
     const p = this.target.requestPointerLock?.() as unknown;
     if (p && typeof (p as Promise<void>).catch === 'function') (p as Promise<void>).catch(() => undefined);
   }

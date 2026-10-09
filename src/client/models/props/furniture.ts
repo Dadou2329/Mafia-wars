@@ -1,9 +1,8 @@
 // Mobilier victorien : sièges, tables, lits, rangements, pianos.
 // Résolution 1/16 m, origine au centre de la base, l'avant regarde vers +Z.
 
-import { C, P, SLOT, VoxelModel, shade, mix, grain, grainBox, blockJitter, speckle, colors, rbox, paint, pix, curve, line6, hash3, rng, books, turnedLeg, framePanel, drawer, discXY } from './helpers';
+import { C, P, SLOT, VoxelModel, shade, mix, grain, grainBox, blockJitter, colors, line6, hash3, books, turnedLeg, framePanel, drawer } from './helpers';
 
-const WOODS = [C.mahogany, C.walnut, C.oak, P.rosewood];
 
 // ---------------------------------------------------------------------------------------
 // Sièges
@@ -791,10 +790,3 @@ export function grandPiano(variant = 0): VoxelModel {
   return m;
 }
 
-void rbox;
-void paint;
-void pix;
-void curve;
-void rng;
-void WOODS;
-void discXY;

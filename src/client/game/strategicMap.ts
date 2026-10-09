@@ -43,6 +43,7 @@ import { actionKey } from '../input/bindings';
 import { h, clear } from '../ui/dom';
 import { MAP_SCALE } from './cityMap';
 import type { GameClient } from './GameClient';
+import { leNom } from '../../shared/french';
 
 export type Tab = 'orders' | 'recruit' | 'lieutenants' | 'upgrades' | 'armory' | 'view';
 
@@ -130,7 +131,8 @@ export class StrategicMap {
   private panZ = 0;
   private drag: { x: number; y: number; px: number; pz: number; moved: boolean } | null = null;
   private interacting = false;
-  private lastPrivRender = 0;
+  private hovering = false;
+  private bodySig = '';
   private resizeObs: ResizeObserver | null = null;
   private mouse = { x: -1, y: -1 };
 
@@ -168,6 +170,12 @@ export class StrategicMap {
     );
     this.body.addEventListener('pointerdown', () => (this.interacting = true));
     window.addEventListener('pointerup', () => (this.interacting = false));
+    // on ne reconstruit jamais le panneau sous le curseur (clics perdus, survols qui clignotent)
+    this.body.addEventListener('pointerenter', () => (this.hovering = true));
+    this.body.addEventListener('pointerleave', () => {
+      this.hovering = false;
+      if (this.open && this.signature() !== this.bodySig) this.renderBody();
+    });
     this.setupCanvas();
   }
 
@@ -190,6 +198,7 @@ export class StrategicMap {
     this.title.textContent = this.remote ? 'Carte de Londres' : `Bureau ${DE_BOSS[this.gc.you]} — Carte stratégique`;
     this.resize();
     this.renderAll();
+    this.body.scrollTop = 0;
     this.draw();
   }
 
@@ -212,11 +221,48 @@ export class StrategicMap {
     void p;
     if (!this.open) return;
     this.renderStats();
-    // on évite de reconstruire le panneau pendant qu'on manipule un curseur
-    const now = performance.now();
-    if (this.interacting || now - this.lastPrivRender < 450) return;
-    this.lastPrivRender = now;
-    this.renderBody();
+    // le panneau n'est reconstruit que si ce qu'il affiche a changé, et jamais sous le curseur
+    if (this.interacting || this.hovering) return;
+    if (this.signature() !== this.bodySig) this.renderBody();
+  }
+
+  /** Résumé des données affichées dans le panneau (pour éviter les reconstructions inutiles). */
+  private signature(): string {
+    const gc = this.gc;
+    const p = gc.priv;
+    const money = p.money;
+    const sel = this.sel;
+    const selInfo =
+      sel?.kind === 'building'
+        ? (() => {
+            const st = gc.pub.buildings[sel.id];
+            return st ? [st.owner, Math.round(st.cap * 10), st.contested, st.guards, money >= BUILDINGS[sel.id].price] : null;
+          })()
+        : sel?.kind === 'district'
+          ? [gc.pub.districts.find((d) => d.id === sel.id)?.owner, ...keyBuildings(sel.id).map((k) => gc.pub.buildings[k.id]?.owner)]
+          : null;
+    return JSON.stringify([
+      this.tab,
+      this.remote,
+      sel,
+      selInfo,
+      this.pending,
+      this.ltChoice,
+      this.feedback?.text,
+      gc.pub.territories[gc.you],
+      p.men,
+      p.pool,
+      p.escort,
+      p.upgrades,
+      p.weapons,
+      p.ammo,
+      p.lieutenants.map((l) => [l.id, l.name, l.alive, l.men, l.menStart, l.order, l.targetName, l.state, Math.round(l.progress * 20), Math.ceil(l.recoverIn / 5)]),
+      RECRUIT_BUNDLES.map((b) => money >= b.price),
+      money >= (LIEUTENANT_PRICES[p.lieutenants.length] ?? Infinity),
+      UPGRADES.map((u) => money >= u.price),
+      BOSS_SHOP.map((b) => money >= b.price),
+      money >= AMMO_PRICE,
+    ]);
   }
 
   onOrderReply(lt: number, ok: boolean): void {
@@ -399,7 +445,7 @@ export class StrategicMap {
     if (!st) return '';
     if (st.owner === Faction.DADOU) return this.gc.you === 'dadou' ? 'À vous' : 'Tenu par Dadou';
     if (st.owner === Faction.EVEN) return this.gc.you === 'even' ? 'À vous' : 'Tenu par Even';
-    if (st.guards > 0) return `Tenu par ${DISTRICT_BY_ID[def.district].gang} (${st.guards} défenseur${st.guards > 1 ? 's' : ''})`;
+    if (st.guards > 0) return `Tenu par ${leNom(DISTRICT_BY_ID[def.district].gang)} (${st.guards} défenseur${st.guards > 1 ? 's' : ''})`;
     return def.price > 0 ? `À vendre : ${formatMoney(def.price)}` : 'Abandonné';
   }
 
@@ -508,6 +554,26 @@ export class StrategicMap {
       c.textBaseline = 'middle';
       c.fillStyle = '#ff7a2a';
       c.fillText('⚔', bt.x * M, bt.z * M);
+    }
+    // événement aléatoire
+    const ev = gc.activeEvent;
+    if (ev && (ev.kind === 'contraband' || ev.kind === 'raid')) {
+      const raid = ev.kind === 'raid';
+      c.strokeStyle = raid ? 'rgba(60,90,170,0.9)' : 'rgba(200,140,20,0.95)';
+      c.lineWidth = 4 / S;
+      c.setLineDash(raid ? [10 / S, 6 / S] : []);
+      c.beginPath();
+      c.arc(ev.x * M, ev.z * M, (raid ? 16 : 4 + (now % 1) * 4) * M, 0, Math.PI * 2);
+      c.stroke();
+      c.setLineDash([]);
+      c.font = `700 ${Math.max(22, 26 / S)}px 'Cinzel', serif`;
+      c.textAlign = 'center';
+      c.textBaseline = 'middle';
+      c.fillStyle = raid ? '#2a4a9a' : '#a8740a';
+      c.fillText(raid ? '⚑' : '£', ev.x * M, ev.z * M);
+      c.font = `600 ${13 / S}px 'EB Garamond', serif`;
+      c.fillStyle = '#2a1a0c';
+      c.fillText(raid ? 'Descente de police' : 'Contrebande', ev.x * M, ev.z * M + 22 / S);
     }
     // ennemis repérés
     for (const sp of priv.spotted) {
@@ -678,9 +744,11 @@ export class StrategicMap {
             class: `sm-tab${this.tab === id ? ' on' : ''}`,
             on: {
               click: () => {
+                const changed = this.tab !== id;
                 this.tab = id;
                 this.gc.app.click();
                 this.renderAll();
+                if (changed) this.body.scrollTop = 0;
               },
             },
           },
@@ -691,6 +759,7 @@ export class StrategicMap {
   }
 
   private renderBody(): void {
+    this.bodySig = this.signature();
     const b = this.body;
     const scroll = b.scrollTop;
     clear(b);

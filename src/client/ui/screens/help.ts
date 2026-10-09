@@ -6,7 +6,7 @@ import { settings } from '../../settings';
 import { DISTRICT_BONUS, HQ_CAPTURE_MIN_DISTRICTS, LIEUTENANT_RECOVERY, RESPAWN_PENALTY, RESPAWN_PENALTY_MAX } from '../../../shared/constants';
 import { formatMoney } from '../../../shared/util';
 import { h } from '../dom';
-import { BRAND, TITLE, button, closeOnEscape, fr, icon, type IconName } from './menu';
+import { BRAND, TITLE, button, closeOnEscape, fr, icon, shieldPointer, type IconName } from './menu';
 
 type Child = Node | string;
 
@@ -193,11 +193,16 @@ export function helpPanel(app: AppApi, opts: { onClose(): void }): HTMLElement {
   const toc = h('nav', { class: 'mw-help-toc', 'aria-label': 'Sommaire' });
   const tocBtns: HTMLButtonElement[] = [];
   const els: HTMLElement[] = [];
+  const mark = (cur: number): void => tocBtns.forEach((b, i) => b.classList.toggle('is-on', i === cur));
+  // entrée choisie dans le sommaire : elle reste active pendant le défilement automatique
+  let pinnedUntil = 0;
   secs.forEach((s, i) => {
     const sec = h('section', { class: 'mw-help-sec', id: `mw-help-${s.id}` }, h('h3', null, icon(s.icon), h('span', null, s.title)), ...s.body());
     els.push(sec);
     page.appendChild(sec);
     const b = button(app, [h('span', { class: 'mw-toc-num' }, String(i + 1)), h('span', null, s.title)], 'mw-toc-btn', () => {
+      pinnedUntil = performance.now() + 1200;
+      mark(i);
       page.scrollTo({ top: sec.offsetTop - 12, behavior: 'smooth' });
     });
     tocBtns.push(b);
@@ -207,12 +212,15 @@ export function helpPanel(app: AppApi, opts: { onClose(): void }): HTMLElement {
 
   // le sommaire suit la lecture
   const sync = (): void => {
+    if (performance.now() < pinnedUntil) return;
     let cur = 0;
     for (let i = 0; i < els.length; i++) if (els[i].offsetTop - page.scrollTop < 90) cur = i;
     if (page.scrollTop + page.clientHeight >= page.scrollHeight - 4) cur = els.length - 1;
-    tocBtns.forEach((b, i) => b.classList.toggle('is-on', i === cur));
+    mark(cur);
   };
   page.addEventListener('scroll', sync, { passive: true });
+  // une action de l'utilisateur sur la page reprend la main sur le sommaire
+  for (const ev of ['wheel', 'pointerdown', 'keydown'] as const) page.addEventListener(ev, () => (pinnedUntil = 0), { passive: true });
 
   const panel = h(
     'div',
@@ -225,6 +233,7 @@ export function helpPanel(app: AppApi, opts: { onClose(): void }): HTMLElement {
     app.click();
     opts.onClose();
   });
+  shieldPointer(panel, true);
   requestAnimationFrame(sync);
   return panel;
 }
@@ -276,5 +285,6 @@ export function creditsPanel(app: AppApi, opts: { onClose(): void }): HTMLElemen
     app.click();
     opts.onClose();
   });
+  shieldPointer(panel, true);
   return panel;
 }

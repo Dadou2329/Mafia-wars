@@ -36,6 +36,7 @@ export class Room {
   settings: MatchSettings = { timeLimit: 0, daytime: 'cycle', tutorial: true };
   game: Game | null = null;
   private timer: NodeJS.Timeout | null = null;
+  private errors = 0;
   private lastSent: Record<Slot, Map<number, number>> = { dadou: new Map(), even: new Map() };
   private pausedSince = -1;
   private rematch = new Set<string>();
@@ -179,7 +180,19 @@ export class Room {
       last = now;
       while (acc >= TICK_DT) {
         acc -= TICK_DT;
-        this.tick();
+        try {
+          this.tick();
+        } catch (e) {
+          // une erreur de simulation ne doit pas faire tomber le serveur ni les autres salons
+          console.error(`[salon ${this.code}] erreur de simulation :`, e);
+          this.errors++;
+          if (this.errors > 50) {
+            console.error(`[salon ${this.code}] trop d'erreurs : arrêt de la partie.`);
+            if (this.timer) clearInterval(this.timer);
+            this.timer = null;
+          }
+          break;
+        }
       }
     }, 1000 * TICK_DT * 0.5);
   }

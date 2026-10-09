@@ -6,7 +6,7 @@ import type { MatchSettings, RoomState, Slot } from '../../../shared/protocol';
 import { BOSS_NAME, MAFIA_NAME } from '../../../shared/constants';
 import { onWorldProgress } from '../../world/worldLoader';
 import { clear, h } from '../dom';
-import { BRAND, TITLE, ambience, button, choose, fr, icon, pct, withSounds } from './menu';
+import { BRAND, TITLE, ambience, button, choose, fr, icon, pct, shieldPointer, withSounds } from './menu';
 import { currentPortraits } from './settings';
 
 const SLOTS: Slot[] = ['dadou', 'even'];
@@ -389,7 +389,7 @@ export function lobbyScreen(app: AppApi): { el: HTMLElement; dispose(): void } {
   const side = h('aside', { class: 'mw-lobby-side' }, playersBox, settingsBox, chatBox);
 
   // ------------------------------------------------------------ pied : quitter, prêt, état
-  const leave = button(app, [icon('exit'), 'Quitter le salon'], 'btn ghost mw-foot-btn', () => app.leaveRoom());
+  const leave = button(app, [icon('exit'), 'Quitter le salon'], 'btn ghost small mw-foot-btn', () => app.leaveRoom());
   const toSettings = button(app, [icon('gear'), 'Paramètres'], 'btn ghost small mw-foot-btn', () => app.showSettings());
   const toControls = button(app, [icon('keyboard'), 'Commandes'], 'btn ghost small mw-foot-btn', () => app.showControls());
   const statusMain = h('div', { class: 'mw-lobby-status', role: 'status', 'aria-live': 'polite' });
@@ -432,23 +432,19 @@ export function lobbyScreen(app: AppApi): { el: HTMLElement; dispose(): void } {
     for (const id of ids) {
       const p = r.players[id];
       const slot: Slot | null = r.picks.dadou === id ? 'dadou' : r.picks.even === id ? 'even' : null;
-      const state = !p.connected ? 'Déconnecté' : p.ready ? fr('Prêt !') : slot ? 'Pas encore prêt' : 'Choisit son parrain…';
+      const state = !p.connected ? 'Déconnecté' : p.ready ? fr('Prêt !') : slot ? 'Pas prêt' : 'Sans parrain';
+      const who = slot ? `${p.name} incarne ${BOSS_NAME[slot]}` : p.name;
       playersList.appendChild(
         h(
           'div',
-          { class: `mw-player${p.ready ? ' is-ready' : ''}${p.connected ? '' : ' is-off'}`, 'data-slot': slot ?? 'none' },
-          h('span', { class: 'mw-player-dot', title: p.connected ? 'Connecté' : 'Déconnecté' }),
+          { class: `mw-player${p.ready ? ' is-ready' : ''}${p.connected ? '' : ' is-off'}`, 'data-slot': slot ?? 'none', title: who },
+          slot ? h('img', { class: 'mw-player-emblem', src: BRAND.emblem[slot], alt: BOSS_NAME[slot] }) : h('span', { class: 'mw-player-dot', title: p.connected ? 'Connecté' : 'Déconnecté' }),
           h(
             'div',
-            { class: 'mw-player-main' },
-            h(
-              'div',
-              { class: 'mw-player-name' },
-              h('span', { class: 'mw-player-nm' }, p.name),
-              id === me() ? h('span', { class: 'mw-you' }, '(vous)') : null,
-              p.isHost ? h('span', { class: 'mw-badge', title: 'Hôte de la partie' }, icon('crown'), 'Hôte') : null,
-            ),
-            h('div', { class: 'mw-player-role' }, slot ? h('span', { class: `c-${slot}` }, BOSS_NAME[slot]) : h('span', { class: 'dim' }, 'Sans parrain')),
+            { class: 'mw-player-name' },
+            h('span', { class: 'mw-player-nm' }, p.name),
+            id === me() ? h('span', { class: 'mw-you' }, '(vous)') : null,
+            p.isHost ? h('span', { class: 'mw-badge', title: 'Hôte de la partie' }, icon('crown'), 'Hôte') : null,
           ),
           h('span', { class: 'mw-player-state' }, p.ready ? icon('check') : null, state),
         ),
@@ -460,7 +456,8 @@ export function lobbyScreen(app: AppApi): { el: HTMLElement; dispose(): void } {
           'div',
           { class: 'mw-player is-waiting' },
           h('span', { class: 'mw-player-dot' }),
-          h('div', { class: 'mw-player-main' }, h('div', { class: 'mw-player-name dim' }, fr('En attente d’un adversaire…')), h('div', { class: 'mw-player-role dim' }, fr(`Code du salon : ${r.code}`))),
+          h('div', { class: 'mw-player-name dim' }, fr('En attente d’un adversaire…')),
+          h('span', { class: 'mw-player-state' }, fr(`Code : ${r.code}`)),
         ),
       );
     }
@@ -577,6 +574,7 @@ export function lobbyScreen(app: AppApi): { el: HTMLElement; dispose(): void } {
   if (genDone) offGen();
   else offs.push(offGen);
 
+  shieldPointer(root);
   render();
   renderChat();
 

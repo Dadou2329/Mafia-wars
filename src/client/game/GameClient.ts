@@ -39,6 +39,7 @@ import { helpPanel } from '../ui/screens/help';
 import { victoryScreen } from '../ui/screens/victory';
 import { CityMap } from './cityMap';
 import { Effects } from './effects';
+import { EventMarker } from './eventMarker';
 import { EntityStore, type ClientEnt } from './entities';
 import { Hud } from './hud';
 import { drawMinimap } from './minimap';
@@ -49,8 +50,10 @@ import { Tutorial } from './tutorial';
 import { DoorSystem } from './doors';
 import { SignSystem } from './signs';
 import { Civilians } from './civilians';
+import { Carriages } from './carriages';
 import { Viewmodel } from './viewmodel';
 import { WeaponSystem, surfaceKind } from './weapons';
+import { leNom } from '../../shared/french';
 
 export interface GameInit {
   you: Slot;
@@ -90,8 +93,13 @@ export class GameClient {
   readonly doors: DoorSystem;
   readonly signs: SignSystem;
   readonly civilians: Civilians;
+  readonly carriages: Carriages;
   readonly viewmodel: Viewmodel;
   readonly post: PostFX;
+  readonly marker = new EventMarker();
+  /** Événement aléatoire en cours (annoncé par le serveur). */
+  activeEvent: Extract<GameEvent, { t: 'event' }> | null = null;
+  private fogBoost = 1;
   private water: ReturnType<typeof createWater>;
   pub: PublicState;
   priv: PrivateState;
@@ -109,6 +117,7 @@ export class GameClient {
   private paused = false;
   private serverPause: string | null = null;
   private fpsAcc = { t: 0, n: 0, v: 0 };
+  private fpsLast = performance.now();
   private hudAcc = 0;
   private mapAcc = 0;
   private myView: CharView;
@@ -156,12 +165,15 @@ export class GameClient {
     this.chars.maxDistance = q.charDist;
     this.scene.add(this.chars.group);
     this.scene.add(this.effects.group);
+    this.scene.add(this.marker.group);
     this.effects.setEmitters(world.smokes);
     this.doors = new DoorSystem(world.props, world.buildings, world.world);
     this.scene.add(this.doors.group);
     this.signs = new SignSystem(world.buildings, this.you);
     this.scene.add(this.signs.group);
     this.civilians = new Civilians(world, this.store);
+    this.carriages = new Carriages(world);
+    this.scene.add(this.carriages.group);
     this.viewmodel = new Viewmodel();
     this.viewmodel.setLook(this.you, settings.custom[this.you]);
     this.post = new PostFX(this.renderer, this.scene, this.camera);
@@ -246,6 +258,7 @@ export class GameClient {
     // ---------------------------------------------------------------- entrées
     const input = app.input;
     input.blocked = false;
+    input.lockEnabled = true;
     input.onEscape = () => this.onEscape();
     input.onUnlock = () => {
       if (!this.modal && !this.strategic.open && !this.chatting && !this.wheel.open && !this.over) this.openPause();
@@ -455,6 +468,22 @@ export class GameClient {
       case 'sound':
         audio.play(e.s as SfxName, { pos: { x: e.x, y: e.y, z: e.z } });
         break;
+      case 'event':
+        if (e.kind === 'end') {
+          this.activeEvent = null;
+          this.marker.hide();
+          this.hud.setEvent(null);
+        } else {
+          this.activeEvent = e;
+          this.hud.notify(e.text, 'alert', 10000);
+          audio.play(e.kind === 'raid' ? 'police_whistle' : 'alert', { volume: 0.8 });
+          if (e.kind === 'contraband') {
+            const y = this.world.nav.heightAt(e.x, e.z);
+            this.marker.show(e.x, Number.isFinite(y) ? y : 0, e.z);
+          }
+        }
+        this.strategic.dirty = true;
+        break;
       default:
         break;
     }
@@ -516,7 +545,13 @@ export class GameClient {
     if (this.chatting) return this.closeChat();
     if (this.wheel.open) return this.wheel.cancel();
     if (this.strategic.open) return this.strategic.close();
-    if (this.modal) return this.closeModal();
+    if (this.modal) {
+      // Échap ferme la pause (ou le panneau ouvert depuis la pause) et rend la main au jeu
+      this.paused = false;
+      this.closeModal();
+      this.app.input.requestLock();
+      return;
+    }
     if (this.over) return;
     this.openPause();
   }
@@ -573,6 +608,11 @@ export class GameClient {
         onHelp: () => this.openModal(h('div', { class: 'screen dim-bg' }, helpPanel(this.app, { onClose: () => ((this.paused = false), this.openPause()) }))),
       }),
     );
+  }
+
+  /** Le parrain a-t-il été placé dans le monde (premier instantané reçu) ? */
+  get isPlaced(): boolean {
+    return this.placed;
   }
 
   /** Petit geste du parrain (ordre donné, interaction). */
@@ -657,6 +697,8 @@ export class GameClient {
     if (this.placed) list.push(mv);
     const civViews = this.civilians.update(dt, now, this.player.pos, this.recentShots);
     for (const c of civViews) list.push(c);
+    const cabViews = this.carriages.update(dt, now, this.player.pos, list);
+    for (const c of cabViews) list.push(c);
     this.chars.update(list, this.camera, now, dt);
     // ------------------------------------------------- monde
     const camPos = this.camera.position;
@@ -674,7 +716,10 @@ export class GameClient {
     this.atmo.time = this.dayTimeSmooth;
     this.atmo.update(dt, now, this.player.pos, this.camera);
     const fq = qualityProfile(settings.quality).fogScale;
-    envUniforms.uFogDensity.value *= fq;
+    const fogTarget = this.activeEvent?.kind === 'fog' ? 2.6 : 1;
+    this.fogBoost += (fogTarget - this.fogBoost) * Math.min(1, dt * 0.25);
+    envUniforms.uFogDensity.value *= fq * this.fogBoost;
+    this.marker.update(now);
     const wu = this.water.mat.uniforms;
     wu.uSkyTop.value.copy(this.atmo.skyMat.uniforms.uZenith.value);
     wu.uSkyHorizon.value.copy(this.atmo.skyMat.uniforms.uHorizon.value);
@@ -700,10 +745,12 @@ export class GameClient {
     this.mapAcc += dt;
     if (this.mapAcc > 0.15) {
       this.mapAcc = 0;
-      drawMinimap(this.hud.minimapCanvas, this.map, this.player.pos.x, this.player.pos.z, this.player.yaw, this.store, this.pub, this.priv, this.you, this.selfId);
+      drawMinimap(this.hud.minimapCanvas, this.map, this.player.pos.x, this.player.pos.z, this.player.yaw, this.store, this.pub, this.priv, this.you, this.selfId, this.activeEvent);
       if (this.strategic.open) this.strategic.draw();
     }
-    this.fpsAcc.t += dt;
+    // images par seconde réelles (dt est plafonné pour la simulation)
+    this.fpsAcc.t += Math.max(0.001, (t - this.fpsLast) / 1000);
+    this.fpsLast = t;
     this.fpsAcc.n++;
     if (this.fpsAcc.t > 0.5) {
       this.fpsAcc.v = this.fpsAcc.n / this.fpsAcc.t;
@@ -845,9 +892,19 @@ export class GameClient {
         const who = st.capBy === this.myFaction ? 'Capture' : 'Ennemis en train de capturer';
         hud.setCapture(`${def.name} — ${st.contested ? 'CONTESTÉ !' : `${who} : ${Math.round(st.cap * 100)} %`}`, st.cap, st.contested);
       } else if (st.owner !== this.myFaction) {
-        hud.setCapture(`${def.name} — tenu par ${ownerName}. Éliminez les défenseurs et restez à l’intérieur.`, 0, false);
+        hud.setCapture(`${def.name} — tenu par ${leNom(ownerName)}. Éliminez les défenseurs et restez à l’intérieur.`, 0, false);
       } else hud.setCapture(null);
     } else hud.setCapture(null);
+    // événement aléatoire
+    const ev = this.activeEvent;
+    if (ev) {
+      const left = Math.max(0, Math.round(ev.until - this.pub.elapsed));
+      const time = `${Math.floor(left / 60)}:${String(left % 60).padStart(2, '0')}`;
+      if (ev.kind === 'contraband') hud.setEvent('CARGAISON DE CONTREBANDE', `À ${Math.round(Math.hypot(ev.x - p.x, ev.z - p.z))} m — encore ${time}`);
+      else if (ev.kind === 'raid') hud.setEvent('DESCENTE DE POLICE', `${districtAt(ev.x, ev.z).name} — encore ${time}`);
+      else if (ev.kind === 'fog') hud.setEvent('BROUILLARD', `Visibilité réduite — encore ${time}`);
+      else if (ev.kind === 'informant') hud.setEvent('INFORMATEUR', `Positions ennemies révélées — encore ${time}`);
+    } else hud.setEvent(null);
     // interaction contextuelle
     this.interact = this.findInteraction(bid);
     if (this.interact && !this.strategic.open) hud.setPrompt(this.interact.key, this.interact.text, this.interact.sub);
@@ -941,7 +998,7 @@ export class GameClient {
       if (def.capturable && st.owner === Faction.NEUTRAL && def.price > 0 && st.guards === 0)
         return {
           key,
-          text: `Acheter ${def.name} — ${formatMoney(def.price)}`,
+          text: `Acheter ${leNom(def.name)} — ${formatMoney(def.price)}`,
           sub: `+${def.income} £/min`,
           run: () => {
             this.app.net.act({ a: 'buyBuilding', b: bid });
@@ -993,7 +1050,8 @@ export class GameClient {
     this.app.input.onUnlock = null;
     this.app.input.onKey = null;
     this.app.input.exitLock();
-    this.app.input.blocked = false;
+    this.app.input.blocked = true;
+    this.app.input.lockEnabled = false;
     this.strategic.dispose();
     this.renderer.dispose();
     this.canvas.remove();

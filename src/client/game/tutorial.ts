@@ -11,6 +11,7 @@ import { settings } from '../settings';
 import { h } from '../ui/dom';
 import type { ClientEnt } from './entities';
 import type { GameClient } from './GameClient';
+import { cap, deNom, leNom } from '../../shared/french';
 
 type Step = 'intro' | 'desk' | 'order' | 'capture' | 'done' | 'free';
 
@@ -25,6 +26,7 @@ export class Tutorial {
   private kills = 0;
   private fired = false;
   private lastText = '';
+  private started = false;
 
   constructor(gc: GameClient) {
     this.gc = gc;
@@ -32,12 +34,26 @@ export class Tutorial {
     const def = BUILDING_BY_KEY[key];
     this.targetId = def.id;
     this.targetName = def.name;
-    if (!gc.settings.tutorial || this.targetOwned()) {
-      this.step = 'free';
-      this.setGoal();
-      return;
-    }
-    this.showCard();
+    if (!gc.settings.tutorial || this.targetOwned()) this.step = 'free';
+    // la carte de mission et les objectifs apparaissent quand le parrain est dans le monde
+  }
+
+  private start(): void {
+    this.started = true;
+    this.t = 0;
+    if (this.step !== 'free') this.showCard();
+    this.setGoal();
+  }
+
+  /** « Chat Noir » pour « Le Chat Noir » (l'article est contracté dans la phrase). */
+  private bareName(): string {
+    return this.targetName.replace(/^(Le |La |Les |L’)/, '');
+  }
+
+  /** « du  », « de l’ », « de la  »… devant le nom de la cible. */
+  private dePrefix(): string {
+    const de = deNom(this.targetName);
+    return de.slice(0, de.length - this.bareName().length);
   }
 
   private targetOwned(): boolean {
@@ -62,8 +78,8 @@ export class Tutorial {
         'p',
         null,
         `${BOSS_NAME[gc.you]}, vous n’êtes encore qu’un petit parrain : un pub, cinq hommes, 500 £ et un lieutenant fidèle, ${lt}. `,
-        `Pour bâtir votre empire, emparez-vous de `,
-        h('b', null, this.targetName),
+        `Pour bâtir votre empire, emparez-vous ${this.dePrefix()}`,
+        h('b', null, this.bareName()),
         '.',
       ),
       h('p', { class: 'dim' }, 'Suivez les objectifs affichés en haut à gauche.'),
@@ -88,16 +104,16 @@ export class Tutorial {
         text = `Entrez dans votre bureau, ${gc.you === 'dadou' ? 'au fond du Lion Rouge' : 'au fond de l’Ancre Bleue'} (derrière la salle du bar), et appuyez sur ${this.key('interact')} devant votre table de travail.`;
         break;
       case 'order':
-        text = `Sur la carte, cliquez sur ${this.targetName}, puis « Attaquer » : choisissez votre lieutenant et lancez l’attaque.`;
+        text = `Sur la carte, cliquez sur ${leNom(this.targetName)}, puis « Attaquer » : choisissez votre lieutenant et lancez l’attaque.`;
         break;
       case 'capture': {
         const st = gc.pub.buildings[this.targetId];
         const g = st ? st.guards : 0;
-        text = `Prenez ${this.targetName} : éliminez les défenseurs${g > 0 ? ` (${g} restant${g > 1 ? 's' : ''})` : ''} et restez à l’intérieur jusqu’à la capture.`;
+        text = `Prenez ${leNom(this.targetName)} : éliminez les défenseurs${g > 0 ? ` (${g} restant${g > 1 ? 's' : ''})` : ''} et restez à l’intérieur jusqu’à la capture.`;
         break;
       }
       case 'done':
-        text = `Mission accomplie ! ${this.targetName} vous appartient.`;
+        text = `Mission accomplie ! ${cap(leNom(this.targetName))} vous appartient.`;
         done = true;
         break;
       case 'free': {
@@ -130,6 +146,10 @@ export class Tutorial {
   }
 
   update(dt: number): void {
+    if (!this.started) {
+      if (this.gc.isPlaced) this.start();
+      return;
+    }
     this.t += dt;
     switch (this.step) {
       case 'intro':
@@ -139,7 +159,7 @@ export class Tutorial {
         if (this.t > 30) this.hint('desk-path', `Astuce : le bureau ${DE_BOSS[this.gc.you]} est la pièce tapissée au fond du pub, derrière le comptoir. Sa porte porte une plaque de laiton.`);
         break;
       case 'order':
-        if (this.t > 40) this.hint('order-help', `Astuce : dans la carte, cliquez sur ${this.targetName}, puis sur « Attaquer ». Vous pouvez aussi y aller vous-même avec vos hommes (${this.key('wheel')} : « Suivez-moi »).`);
+        if (this.t > 40) this.hint('order-help', `Astuce : dans la carte, cliquez sur ${leNom(this.targetName)}, puis sur « Attaquer ». Vous pouvez aussi y aller vous-même avec vos hommes (${this.key('wheel')} : « Suivez-moi »).`);
         break;
       case 'capture':
         this.setGoal();
@@ -171,7 +191,7 @@ export class Tutorial {
     if (bid !== this.targetId) return;
     if (this.step === 'free' || this.step === 'done') return;
     this.advance('done');
-    this.gc.hud.notify(`Mission accomplie ! ${this.targetName} rapporte désormais +${BUILDING_BY_KEY[FIRST_MISSION_TARGET[this.gc.you]].income} £/min.`, 'good', 8000);
+    this.gc.hud.notify(`Mission accomplie ! ${cap(leNom(this.targetName))} rapporte désormais +${BUILDING_BY_KEY[FIRST_MISSION_TARGET[this.gc.you]].income} £/min.`, 'good', 8000);
   }
 
   onPriv(p: PrivateState): void {

@@ -602,7 +602,7 @@ export function generateBuilding(ctx: GenContext, def: BuildingDef): BuildingInf
     f.prop('LAMP_WALL', doorLx + st.doorW + 2.2, lv.floorTop + 9, -1.1, Math.PI);
   }
   if (st.ground === 'pub' && lv.storyBase.length > 1) {
-    f.prop('HANGING_SIGN', doorLx + st.doorW + 5, lv.storyBase[1] + 1, -3.5, Math.PI / 2, def.hq === 'dadou' ? 1 : def.hq === 'even' ? 2 : 0);
+    f.prop('HANGING_SIGN', doorLx + st.doorW + 5, lv.storyBase[1] + 1, -1.8, Math.PI / 2, def.hq === 'dadou' ? 1 : def.hq === 'even' ? 2 : 0);
   }
   if (def.hq && lv.storyBase.length > 1) {
     const cols = windowColumns(f.W, st.winW, st.winSpacing, 4);

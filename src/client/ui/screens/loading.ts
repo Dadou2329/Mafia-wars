@@ -4,7 +4,7 @@ import { keyLabel, type ActionId } from '../../input/bindings';
 import { settings } from '../../settings';
 import { DISTRICT_BONUS, HQ_CAPTURE_MIN_DISTRICTS } from '../../../shared/constants';
 import { h } from '../dom';
-import { BRAND, TITLE, ambience, fr, pct, watchUnmount } from './menu';
+import { BRAND, TITLE, ambience, fr, pct, shieldPointer, watchUnmount } from './menu';
 
 function key(id: ActionId): string {
   const c = settings.bindings[id]?.[0];
@@ -61,6 +61,8 @@ export function loadingScreen(): { el: HTMLElement; set(step: string, f: number)
       tip,
     ),
   );
+
+  shieldPointer(el);
 
   // une astuce différente toutes les 5 secondes, en fondu
   let swapTimer = 0;

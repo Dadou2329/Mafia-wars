@@ -17,6 +17,7 @@ export class Hud {
   private men!: HTMLElement;
   private terr!: HTMLElement;
   private objective!: HTMLElement;
+  private eventLine!: HTMLElement;
   private notices!: HTMLElement;
   private capture!: HTMLElement;
   private captureLbl!: HTMLElement;
@@ -61,6 +62,7 @@ export class Hud {
     this.men = h('b');
     this.terr = h('b');
     this.objective = h('div', { class: 'hud-objective' });
+    this.eventLine = h('div', { class: 'hud-event hidden' });
     this.el.appendChild(
       h(
         'div',
@@ -71,6 +73,7 @@ export class Hud {
         h('div', { class: 'row' }, h('span', null, 'Hommes'), this.men),
         h('div', { class: 'row' }, h('span', null, 'Territoires'), this.terr),
         this.objective,
+        this.eventLine,
       ),
     );
     this.notices = h('div', { class: 'hud-notices' });
@@ -183,6 +186,21 @@ export class Hud {
     this.objective.classList.toggle('done', done);
     this.objective.appendChild(h('span', { class: 'lbl' }, done ? 'OBJECTIF ACCOMPLI' : 'OBJECTIF'));
     this.objective.appendChild(document.createTextNode(text));
+  }
+
+  /** Événement aléatoire en cours (cargaison de contrebande, descente de police…). */
+  setEvent(title: string | null, detail = ''): void {
+    if (!title) {
+      this.eventLine.classList.add('hidden');
+      return;
+    }
+    this.eventLine.classList.remove('hidden');
+    const key = title + detail;
+    if (this.eventLine.dataset.k === key) return;
+    this.eventLine.dataset.k = key;
+    clear(this.eventLine);
+    this.eventLine.appendChild(h('span', { class: 'lbl' }, title));
+    this.eventLine.appendChild(document.createTextNode(detail));
   }
 
   setHealth(f: number): void {

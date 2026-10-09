@@ -9,6 +9,7 @@ import type { LieutenantStatus, Slot } from '../../shared/protocol';
 import { formatTime } from '../../shared/util';
 import { type Game, otherSlot, slotFaction } from './Game';
 import type { Ent, Squad, Vec2 } from './types';
+import { aNom, cap, leNom, pluriel } from '../../shared/french';
 
 export function createSquad(g: Game, lt: Ent, slot: Slot): Squad {
   const sq: Squad = {
@@ -144,7 +145,7 @@ export function giveOrder(g: Game, sq: Squad, type: OrderType, target?: number |
       targetName = def.name;
       const list = buildingsInDistrict(d).filter((b) => b.capturable && g.bstate.get(b.id)!.owner !== mine);
       if (list.length === 0) {
-        g.emitTo(sq.slot, { t: 'order', lt: sq.id, ok: false, text: `${def.name} vous appartient déjà entièrement : ${sq.name} va le défendre.` });
+        g.emitTo(sq.slot, { t: 'order', lt: sq.id, ok: false, text: `${cap(leNom(def.name))} ${pluriel(def.name) ? 'vous appartiennent' : 'vous appartient'} déjà entièrement : ${sq.name} va ${pluriel(def.name) ? 'les' : 'le'} défendre.` });
         return giveOrder(g, sq, 'defend_district', d);
       }
       list.sort((a, b) => {
@@ -298,7 +299,7 @@ export function updateSquad(g: Game, sq: Squad, dt: number): void {
     const where = g.buildingAt(lt.x, lt.z) >= 0 ? BUILDINGS[g.buildingAt(lt.x, lt.z)].name : DISTRICT_NAME(lt);
     if (ratio < 0.7 && sq.lostNotified === 0 && sq.order.type.startsWith('attack')) {
       sq.lostNotified = 1;
-      g.notify(sq.slot, `${sq.name} rencontre une forte résistance à ${where}.`, 'alert');
+      g.notify(sq.slot, `${sq.name} rencontre une forte résistance ${aNom(where)}.`, 'alert');
     }
     if (ratio < 0.4 && !sq.reinfNotified) {
       sq.reinfNotified = true;
@@ -346,7 +347,7 @@ export function updateSquad(g: Game, sq: Squad, dt: number): void {
         break;
       }
       const o = sq.order!;
-      sq.status = `En route vers ${sq.goalBuilding >= 0 ? BUILDINGS[sq.goalBuilding].name : o.targetName}`;
+      sq.status = `En route vers ${leNom(sq.goalBuilding >= 0 ? BUILDINGS[sq.goalBuilding].name : o.targetName)}`;
       // on attend les traînards
       const far = ms.filter((m) => Math.hypot(m.x - lt.x, m.z - lt.z) > 16).length;
       const waiting = far > ms.length * 0.4 && g.time - sq.lastCombat > 3;
@@ -392,13 +393,13 @@ export function updateSquad(g: Game, sq: Squad, dt: number): void {
     }
     case 'hold': {
       const o = sq.order;
-      sq.status = o ? (o.type === 'hold' ? 'Tient la position' : `Défend ${sq.goalBuilding >= 0 ? BUILDINGS[sq.goalBuilding].name : o.targetName}`) : 'En position';
+      sq.status = o ? (o.type === 'hold' ? 'Tient la position' : `Défend ${leNom(sq.goalBuilding >= 0 ? BUILDINGS[sq.goalBuilding].name : o.targetName)}`) : 'En position';
       sq.progress = 1;
       break;
     }
     case 'patrol': {
       const o = sq.order!;
-      sq.status = `Patrouille dans ${o.targetName}`;
+      sq.status = `Patrouille dans ${leNom(o.targetName)}`;
       sq.progress = 1;
       if (sq.patrolPts.length === 0) break;
       const p = sq.patrolPts[sq.patrolI % sq.patrolPts.length];
@@ -420,7 +421,7 @@ export function updateSquad(g: Game, sq: Squad, dt: number): void {
       const other = g.squads.get(Number(sq.order!.target));
       const ol = other ? g.ents.get(other.id) : undefined;
       if (!other || !ol || !ol.alive) {
-        g.notify(sq.slot, `${sq.name} : impossible de rejoindre ${sq.order!.targetName}. Il tient sa position.`, 'info');
+        g.notify(sq.slot, `${sq.name} : impossible de rejoindre ${leNom(sq.order!.targetName)}. Il tient sa position.`, 'info');
         sq.goal = { x: lt.x, z: lt.z };
         setState(g, sq, 'hold');
         break;
@@ -476,7 +477,10 @@ function DISTRICT_NAME(e: Ent): string {
 }
 
 export function squadStatus(g: Game, sq: Squad): LieutenantStatus {
-  const lt = g.ents.get(sq.id)!;
+  const lt = g.ents.get(sq.id);
+  if (!lt) {
+    return { id: sq.id, name: sq.name, alive: false, recoverIn: 0, men: 0, menStart: 0, order: null, targetName: '', state: 'Disparu', progress: 0, x: 0, z: 0 };
+  }
   const alive = lt.alive;
   const ms = members(g, sq);
   return {

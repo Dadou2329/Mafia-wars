@@ -1,8 +1,7 @@
 // Mobilier urbain et objets de rue (Londres, 1888).
 // Résolution 1/16 m, origine au centre de la base, l'avant regarde vers +Z.
 
-import { C, P, SLOT, VoxelModel, shade, mix, grain, blockJitter, speckle, colors, rbox, paint, pix, curve, line6, wheel, discXY, hash3, rng, text } from './helpers';
-import { jitter } from '../voxelModel';
+import { C, P, SLOT, VoxelModel, shade, mix, grain, blockJitter, speckle, colors, rbox, paint, pix, curve, line6, wheel, hash3, rng, text } from './helpers';
 
 const I = C.iron;
 const H = C.ironHi;
@@ -595,8 +594,9 @@ export function crateStack(variant = 0): VoxelModel {
 }
 
 /**
- * Sac de toile rempli. axis 'x'/'z' : couché (oreilles aux coins), 'y' : debout, noué en haut.
- * (cx, cz) centre au sol, y0 base, (rx, ry, rz) demi-dimensions.
+ * Sac de toile rempli. axis 'x'/'z' : couché (col noué à l'extrémité +, oreilles à l'autre),
+ * 'y' : debout, noué en haut. (cx, cz) centre au sol, y0 base, (rx, ry, rz) demi-dimensions.
+ * print : couleur des bandes imprimées (sacs de farine) ou d'un pochoir.
  */
 export function sackAt(
   m: VoxelModel,
@@ -613,76 +613,57 @@ export function sackAt(
 ): void {
   const dark = shade(col, 0.8);
   const light = shade(col, 1.08);
-  const x0 = Math.round(cx - rx);
-  const x1 = Math.round(cx + rx);
-  const z0 = Math.round(cz - rz);
-  const z1 = Math.round(cz + rz);
-  const ya = Math.round(y0);
-  const y1 = Math.round(y0 + ry * 2);
-  const L0 = axis === 'x' ? x0 : axis === 'z' ? z0 : ya;
-  const L1 = axis === 'x' ? x1 : axis === 'z' ? z1 : y1;
-  for (let y = ya; y < y1; y++)
-    for (let z = z0; z < z1; z++)
-      for (let x = x0; x < x1; x++) {
-        // coordonnées normalisées dans la section (u : largeur, v : hauteur), t : le long du sac
-        const t = axis === 'x' ? x : axis === 'z' ? z : y;
-        const fromEnd = Math.min(t - L0, L1 - 1 - t);
-        let u: number;
-        let v: number;
-        if (axis === 'y') {
-          u = (x + 0.5 - cx) / rx;
-          v = (z + 0.5 - cz) / rz;
-        } else {
-          u = axis === 'x' ? (z + 0.5 - cz) / rz : (x + 0.5 - cx) / rx;
-          v = (y + 0.5 - (y0 + ry)) / ry;
-        }
-        // section en coussin : carré aux coins arrondis, plus étroit aux extrémités
-        const squeeze = fromEnd === 0 ? 0.72 : fromEnd === 1 ? 0.92 : 1;
-        const bump = (hash3(Math.floor(x / 2), Math.floor(y / 2), Math.floor(z / 2), seed) - 0.5) * 0.12;
-        const k = Math.pow(Math.abs(u) / squeeze, 2.6) + Math.pow(Math.abs(axis === 'y' ? v : Math.max(v, -0.4)) / (axis === 'y' ? squeeze : 1), 2.6);
-        if (k > 1 + bump) continue;
-        if (axis === 'y' && fromEnd === 0 && t === L1 - 1) continue;
+  const cy = y0 + ry;
+  for (let y = Math.floor(y0); y <= Math.ceil(y0 + ry * 2); y++)
+    for (let z = Math.floor(cz - rz - 1); z <= Math.ceil(cz + rz); z++)
+      for (let x = Math.floor(cx - rx - 1); x <= Math.ceil(cx + rx); x++) {
+        if (y < y0) continue;
+        const px = (x + 0.5 - cx) / rx;
+        const py = (y + 0.5 - cy) / ry;
+        const pz = (z + 0.5 - cz) / rz;
+        const t = axis === 'x' ? px : axis === 'z' ? pz : py;
+        const u = axis === 'x' ? pz : px;
+        const v = axis === 'y' ? pz : py;
+        if (Math.abs(t) > 1) continue;
+        // plus plein au milieu, extrémités arrondies ; base aplatie par le poids
+        const sec = Math.sqrt(Math.max(0, 1 - Math.pow(Math.abs(t), 4))) * (1 + (hash3(Math.floor(x / 2), Math.floor(y / 2), Math.floor(z / 2), seed) - 0.5) * 0.14);
+        const vv = axis === 'y' ? v : Math.max(v, -0.55) * (v > 0 ? 1.08 : 1);
+        if (u * u + vv * vv > sec * sec) continue;
+        if (axis === 'y' && t > 0.93) continue;
         let c = col;
-        if (axis !== 'y' && v > 0.45) c = light;
-        if (axis === 'y' && y > y1 - 4) c = light;
-        if (hash3(x, y, z, seed + 9) < 0.07) c = dark;
+        if (v > 0.5 && axis !== 'y') c = light;
+        if (axis === 'y' && t > 0.6) c = light;
+        if (hash3(x, y, z, seed + 9) < 0.06) c = dark;
+        // bandes imprimées autour de la panse
+        if (print !== undefined && axis !== 'y' && (Math.abs(t + 0.3) < 0.07 || Math.abs(t - 0.3) < 0.07)) c = print;
         m.set(x, y, z, c);
       }
+  const ix = Math.floor(cx);
+  const iz = Math.floor(cz);
   if (axis === 'y') {
-    // col noué et touffe
-    const nx = Math.floor(cx);
-    const nz = Math.floor(cz);
-    m.box(nx - 1, y1 - 1, nz - 1, nx + 1, y1, nz + 1, P.hempDark);
-    m.box(nx - 1, y1, nz - 1, nx + 1, y1 + 1, nz + 1, light);
-    m.set(nx - 1, y1 + 1, nz, light).set(nx, y1 + 1, nz - 1, light);
+    const top = Math.round(y0 + ry * 2 * 0.95);
+    m.box(ix - 1, top - 1, iz - 1, ix + 1, top, iz + 1, P.hempDark);
+    m.box(ix - 1, top, iz - 1, ix + 1, top + 1, iz + 1, light);
+    m.set(ix - 1, top + 1, iz, light).set(ix, top + 1, iz - 1, light);
+    if (print !== undefined) {
+      // pochoir sur le flanc avant
+      const fz = Math.floor(cz + rz) - 1;
+      pix(m, ['.k.', 'k.k', '.k.'], { k: print }, 'xy', ix - 1, Math.round(cy + 1), fz + 1);
+    }
   } else {
-    // oreilles aux quatre coins des extrémités
-    const yt = y1 - 2;
-    for (const e of [L0, L1 - 1])
-      for (const s2 of [-1, 1]) {
-        const w = axis === 'x' ? Math.round(cz + s2 * (rz - 1)) - (s2 > 0 ? 1 : 0) : Math.round(cx + s2 * (rx - 1)) - (s2 > 0 ? 1 : 0);
-        if (axis === 'x') m.set(e, yt, w, light);
-        else m.set(w, yt, e, light);
-      }
-  }
-  // marquage imprimé sur le flanc avant (+Z) ou le dessus
-  if (print !== undefined) {
-    if (axis === 'x' || axis === 'y') {
-      const half = axis === 'x' ? Math.max(1, Math.floor(rx * 0.45)) : Math.max(1, Math.floor(rx * 0.6));
-      const yc = Math.round(y0 + ry * (axis === 'y' ? 0.9 : 1));
-      for (let x = Math.round(cx) - half; x < Math.round(cx) + half; x++)
-        for (let y = yc - 1; y <= yc; y++) {
-          let zz = z1;
-          while (zz > cz && m.get(x, y, zz) < 0) zz--;
-          if (zz > cz && (y === yc || (x - Math.round(cx) + half) % 2 === 0)) m.set(x, y, zz, print);
-        }
+    const iy = Math.round(cy);
+    if (axis === 'x') {
+      const ex = Math.round(cx + rx);
+      m.box(ex - 1, iy - 1, iz - 1, ex, iy + 1, iz + 1, P.hempDark);
+      m.box(ex, iy - 1, iz - 1, ex + 1, iy + 1, iz + 1, light);
+      const bx = Math.round(cx - rx);
+      m.set(bx, iy + 1, Math.round(cz - rz * 0.6), light).set(bx, iy + 1, Math.round(cz + rz * 0.6) - 1, light);
     } else {
-      for (let z = Math.round(cz) - 2; z < Math.round(cz) + 2; z++)
-        for (let x = Math.round(cx) - 1; x <= Math.round(cx); x++) {
-          let yy = y1;
-          while (yy > y0 && m.get(x, yy, z) < 0) yy--;
-          if (yy > y0 && (x === Math.round(cx) || z % 2 === 0)) m.set(x, yy, z, print);
-        }
+      const ez = Math.round(cz + rz);
+      m.box(ix - 1, iy - 1, ez - 1, ix + 1, iy + 1, ez, P.hempDark);
+      m.box(ix - 1, iy - 1, ez, ix + 1, iy + 1, ez + 1, light);
+      const bz = Math.round(cz - rz);
+      m.set(Math.round(cx - rx * 0.6), iy + 1, bz, light).set(Math.round(cx + rx * 0.6) - 1, iy + 1, bz, light);
     }
   }
 }
@@ -691,14 +672,14 @@ export function sacks(variant = 0): VoxelModel {
   const m = new VoxelModel(18, 10, 14);
   if (variant % 2 === 0) {
     const flour = 0xe2dccb;
-    sackAt(m, 9, 0, 3.5, 8.5, 2.4, 3.5, flour, 1, 'x', C.navy);
-    sackAt(m, 9, 0, 10.5, 8.5, 2.4, 3.5, shade(flour, 0.96), 2, 'x', C.red);
-    sackAt(m, 8.5, 4.2, 7, 7.5, 2.8, 3.4, shade(flour, 1.02), 3, 'x', C.navy);
+    sackAt(m, 8.5, 0, 3.7, 8, 2.8, 3.8, flour, 1, 'x', 0x3a5a9a);
+    sackAt(m, 9.5, 0, 10.3, 8, 2.8, 3.8, shade(flour, 0.96), 2, 'x', 0x3a5a9a);
+    sackAt(m, 8.5, 4.2, 7, 7.5, 2.8, 3.6, shade(flour, 1.02), 3, 'x', C.red);
   } else {
-    sackAt(m, 3.5, 0, 4, 3.5, 4.6, 3.5, C.burlap, 4, 'y', C.ink);
-    sackAt(m, 12, 0, 3.5, 6, 2.4, 3.5, C.burlapDark, 5, 'x');
-    sackAt(m, 9, 0, 10.5, 9, 2.4, 3.5, C.burlap, 6, 'x', C.red);
-    sackAt(m, 12.5, 4.3, 7, 3.4, 2.2, 5.5, shade(C.burlap, 1.05), 7, 'z', C.ink);
+    sackAt(m, 3.5, 0, 4, 3.4, 4.8, 3.4, C.burlap, 4, 'y', C.ink);
+    sackAt(m, 12, 0, 3.6, 5.5, 2.6, 3.4, C.burlapDark, 5, 'x');
+    sackAt(m, 9, 0, 10.4, 8.5, 2.6, 3.4, C.burlap, 6, 'x');
+    sackAt(m, 12.5, 4.0, 7, 3.3, 2.5, 5.5, shade(C.burlap, 1.05), 7, 'z');
   }
   m.setOrigin(9, 0, 7);
   return m;
@@ -960,14 +941,12 @@ export function marketStall(variant = 0): VoxelModel {
       m.set(x, 20, 12, flowers[(x * 7) % flowers.length]).set(x + 1, 20, 13, flowers[(x * 3) % flowers.length]);
     }
     // grands seaux de glaïeuls par terre
-    for (const x of [8, 26]) {
-      m.cylY(x, 15, 2.6, 0, 6, P.steel);
-      for (let k = 0; k < 6; k++) {
-        const fx = x - 2 + (k % 3) * 2;
-        const fz = 14 + Math.floor(k / 3) * 2;
-        m.box(fx, 6, fz, fx + 1, 12 + (k % 2), fz + 1, P.leaf);
-        m.box(fx, 10 + (k % 2), fz, fx + 1, 13 + (k % 2), fz + 1, flowers[(k + x) % flowers.length]);
-      }
+    for (const x of [6, 25]) {
+      m.box(x, 0, 13, x + 4, 6, 17, P.steel);
+      m.box(x, 5, 13, x + 4, 6, 17, P.steelLight);
+      m.box(x + 1, 6, 14, x + 3, 11, 16, P.leaf);
+      m.box(x, 10, 13, x + 4, 13, 17, flowers[(x * 3) % flowers.length]);
+      m.box(x + 1, 13, 14, x + 3, 14, 16, flowers[(x * 5 + 1) % flowers.length]);
     }
   }
   // balance suspendue (primeur, poissonnier)
