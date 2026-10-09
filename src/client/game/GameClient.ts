@@ -89,7 +89,7 @@ export class GameClient {
   readonly map: CityMap;
   readonly strategic: StrategicMap;
   readonly wheel: CommandWheel;
-  readonly tutorial: Tutorial;
+  tutorial: Tutorial;
   readonly doors: DoorSystem;
   readonly signs: SignSystem;
   readonly civilians: Civilians;
@@ -309,9 +309,21 @@ export class GameClient {
     for (const id of [...this.store.ents.keys()]) this.store.remove(id);
     for (const i of init.infos) this.store.addInfo(i);
     this.placed = false;
+    // nouvelle partie : on repart d'un parrain vivant, sans événement en cours
+    this.player.dead = false;
+    this.deadSince = -1;
+    this.myView.deathAt = -10;
+    this.hud.showDeath(null);
+    this.activeEvent = null;
+    this.marker.hide();
+    this.hud.setEvent(null);
+    this.fogBoost = 1;
+    this.strategic.close();
+    this.settings = init.settings;
     this.applyPub(init.pub, true);
     this.applyPriv(init.priv);
-    this.settings = init.settings;
+    // revanche (nouvelle partie) : la mission d'introduction repart ; simple reconnexion : on garde
+    if (init.time < 10) this.tutorial = new Tutorial(this);
     if (init.over) this.showVictory(init.over.winner, init.over.reason, null);
     audio.playMusic('game');
   }

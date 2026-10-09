@@ -316,7 +316,7 @@ function stockProfile(z: number, combDrop: number[], toe: number): [number, numb
 
 export function shotgunModels(): ShotgunModels {
   // --- carcasse + crosse
-  const s = new Grid(-1, 1, -3, 5, -10, 21);
+  const s = new Grid(-1, 1, -8, 5, -10, 21);
   const caseCol = (x: number, y: number, z: number) => CASE[hash3(x + 7, y * 3, z * 5) % CASE.length];
   // barre de bascule (sous les canons) et corps
   s.fill(-1, 1, -1, 1, -9, -1, CASE[0]);
@@ -345,7 +345,6 @@ export function shotgunModels(): ShotgunModels {
   // pontet et deux détentes
   s.set(0, -2, -7, BLUE);
   s.fill(0, 0, -3, -3, -7, -2, BLUE);
-  s.set(0, -2, -1, BLUE);
   s.set(0, -3, -7, BLUE_HI).set(0, -3, -2, BLUE_HI);
   s.set(0, -2, -5, BLUE_EDGE); // détente avant (canon droit)
   s.set(0, -2, -3, BLUE_EDGE); // détente arrière (canon gauche)
@@ -678,7 +677,7 @@ function pistolHand(pal: HandPalette): { m: VoxelModel; wrist: Vec3 } {
   L(-1, ['.....', 'naah.', 's..a.', 's..ah', 's..ak', '.ssss', '.sss.']); // annulaire
   L(-2, ['.....', '.ssh.', 's..g.', 's..sh', 's..sk', '.ssss', '.sss.']); // auriculaire (chevalière)
   L(-3, ['.....', '.....', '.....', '...s.', 's..ss', '.ssss', '.....']); // tranche de la main
-  return { m: g.m, wrist: g.p(0.5, -1, 3.5) };
+  return { m: g.m, wrist: g.p(0, -1, 3.5) };
 }
 
 /**
@@ -693,7 +692,7 @@ function stockHand(pal: HandPalette): { m: VoxelModel; wrist: Vec3 } {
   L(1, ['......', '......', '....h.', 'n...hs', 'n...hs', '....hs', '....ss', '....s.', '......']);
   L(0, ['......', '......', '....ss', 's...ss', 'a...ak', 's...sk', '....ss', '....ss', '......']);
   L(-1, ['......', '......', '....s.', 's...ss', 'a...ak', '....sk', '....ss', '....ss', '......']);
-  L(-2, ['..n...', '..sh..', '......', '.ssh..', '.aah..', '.ssh..', '......', '......', '......']);
+  L(-2, ['..ns..', '...h..', '...ss.', '.ssh..', '.aah..', '.ssh..', '......', '......', '......']);
   L(-3, ['......', '......', '......', '..s...', '..a...', '......', '......', '......', '......']);
   return { m: g.m, wrist: g.p(2.5, -0.5, 3.5) };
 }
@@ -727,15 +726,20 @@ function fistHand(pal: HandPalette): { m: VoxelModel; wrist: Vec3 } {
   return { m: g.m, wrist: g.p(0.5, 0, 2.5) };
 }
 
-/** Poing serré sur un manche (couteau, matraque) : même forme, pouce posé sur l'index. */
+/**
+ * Main droite serrée sur un manche dirigé vers −Z (couteau, matraque) : dos de la main à
+ * droite, pouce par-dessus, doigts dessous et bouts des doigts à gauche. Manche de 1 × 2
+ * voxels (x = 0, y ∈ {−1, 0}), origine au centre du manche.
+ */
 function bladeHand(pal: HandPalette): { m: VoxelModel; wrist: Vec3 } {
-  const g = new Grid(-2, 2, -2, 2, -4, 3);
-  const L = (y: number, rows: string[]) => g.layer(y, -2, -4, rows, pal);
-  L(1, ['.....', '.hhgh', '.ssss', '.skss', '.ssss', '..ss.', '..ss.', '.....']);
-  L(0, ['.....', 'nsasa', 'sssss', 'sssss', 'sssss', '.ssss', '.sss.', '.....']);
-  L(-1, ['.....', 'ssssa', 'ssasa', '.ssss', '.ssss', '..ss.', '..ss.', '.....']);
-  L(-2, ['.....', '.....', '.dddd', '..ddd', '.....', '.....', '.....', '.....']);
-  return { m: g.m, wrist: g.p(0.5, 0, 2.5) };
+  const g = new Grid(-1, 2, -2, 1, -3, 3, [0.5, 0, 0.5]);
+  const L = (y: number, rows: string[]) => g.layer(y, -1, -3, rows, pal);
+  // colonnes x : -1 (bouts des doigts), 0 (manche), 1 (paume/phalanges), 2 (dos de la main)
+  L(1, ['....', 'nssh', '..sh', '..sh', '..gh', '...s', '....']);
+  L(0, ['....', 's.ss', 's.ss', 'a.ak', 's.ss', '..ss', '....']);
+  L(-1, ['....', 's.ss', 'n.ss', 'n.as', '..ss', '..ss', '....']);
+  L(-2, ['....', '.sh.', '.sh.', '.ah.', '.sh.', '....', '....']);
+  return { m: g.m, wrist: g.p(1.5, -0.5, 2.5) };
 }
 
 /**

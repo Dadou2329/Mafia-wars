@@ -185,7 +185,7 @@ await shot(A, '07-wheel-A.png');
 await A.keyboard.press('Digit1');
 await sleep(150);
 await A.keyboard.up('KeyQ');
-await sleep(800);
+await A.waitForFunction(() => [...document.querySelectorAll('.hud-notices > *')].some((n) => /suivent|portée/.test(n.textContent ?? '')), null, { timeout: 30000 }).catch(() => undefined);
 console.log('notifications :', await A.evaluate(() => [...document.querySelectorAll('.hud-notices > *')].map((n) => n.textContent).join(' | ')));
 
 step('Carte stratégique et ordre d’attaque');
