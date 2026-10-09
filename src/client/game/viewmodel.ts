@@ -29,7 +29,10 @@ interface PoseDef {
   rot: V3;
 }
 
-/** Une main (et son avant-bras) rigidement attachée à l'arme ou à sa pièce mobile. */
+/**
+ * Une main rigidement attachée à l'arme ou à sa pièce mobile ; son avant-bras part du poignet
+ * et s'oriente à chaque image vers le coude calculé (cinématique inverse, voir solveArms).
+ */
 interface HandSlot {
   pose: VM.HandPose;
   side: 'R' | 'L';
@@ -38,9 +41,11 @@ interface HandSlot {
   /** Position et orientation (Euler XYZ) du repère de la main dans le repère du porteur. */
   pos: V3;
   rot: V3;
-  /** Direction de l'avant-bras (poignet → coude) dans le repère du porteur, roulis de la manche. */
-  arm: V3;
+  /** Roulis de la manche autour de son axe. */
   roll: number;
+  /** Épaule (repère caméra) et direction du coude, si différentes des valeurs par défaut. */
+  shoulder?: V3;
+  pole?: V3;
 }
 
 interface RigDef {
@@ -53,6 +58,11 @@ interface RigDef {
   recoil: { back: number; climb: number; up: number; roll: number };
   /** Point autour duquel l'arme pivote au recul et dans les gestes (≈ poignet), repère de l'arme. */
   pivot: V3;
+  /**
+   * Main gauche qui vient glisser les cartouches pendant le rechargement : images clés
+   * [t, x, y, z, rx, ry, rz, visible] dans le repère de l'arme (m, rad).
+   */
+  helper?: { pose: VM.HandPose; cartridge: 'pistol' | 'rifle' | 'shell'; keys: Key[] };
 }
 
 interface Rig {
@@ -63,66 +73,91 @@ interface Rig {
   moving: THREE.Group | null;
   rims: THREE.Mesh | null;
   arms: THREE.Object3D[];
+  /** Avant-bras orientés à chaque image par la cinématique inverse épaule-coude-poignet. */
+  forearms: { mesh: THREE.Object3D; slot: HandSlot; onMoving: boolean }[];
+  /** Main d'appoint du rechargement (main, cartouche), son avant-bras et la position de son poignet. */
+  helper: { hand: THREE.Group; fore: THREE.Mesh; wrist: THREE.Vector3 } | null;
 }
 
 const S = VM.VM_RES;
+/** Épaules (repère de la caméra) et direction vers laquelle les coudes se plient. */
+const SHOULDER_R: V3 = [0.21, -0.32, 0.05];
+const SHOULDER_L: V3 = [-0.21, -0.32, 0.05];
+const POLE_R: V3 = [0.5, -1, 0.1];
+const POLE_L: V3 = [-0.5, -1, 0.1];
 const sub = (a: V3, b: V3): V3 => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
 
 const RIGS: Record<Weapon, RigDef> = {
   [Weapon.REVOLVER]: {
     meta: VM.REVOLVER,
-    hip: { pos: [0.15, -0.2, -0.4], rot: [0.04, 0.09, 0.06] },
-    ads: { pos: [0, -VM.REVOLVER.sightY, -0.4], rot: [0, 0, 0] },
-    sprint: { pos: [0.11, -0.25, -0.34], rot: [-0.65, 0.5, 0.35] },
-    hands: [{ pose: 'pistol', side: 'R', pos: [0, 0, 0], rot: VM.REVOLVER.gripRot, arm: [0.24, -0.42, 0.87], roll: 0.2 }],
+    hip: { pos: [0.135, -0.12, -0.38], rot: [0.03, 0.34, 0.22] },
+    ads: { pos: [0, -VM.REVOLVER.sightY, -0.44], rot: [0, 0, 0] },
+    sprint: { pos: [0.12, -0.16, -0.34], rot: [-0.55, 0.6, 0.35] },
+    hands: [{ pose: 'pistol', side: 'R', pos: [0, 0, 0], rot: VM.REVOLVER.gripRot, roll: 0.2 }],
     recoil: { back: 0.05, climb: 0.38, up: 0.014, roll: 0.05 },
     pivot: [0, -2 * S, 5 * S],
+    // la main gauche glisse les six cartouches dans les chambres présentées vers le haut
+    helper: {
+      pose: 'fist',
+      cartridge: 'pistol',
+      keys: [
+        [0, -0.12, -0.16, 0.08, -0.6, 0, 1.57, 0],
+        [0.37, -0.12, -0.16, 0.08, -0.6, 0, 1.57, 1],
+        [0.46, -0.004, 0.135, -0.058, -1.2, 0, 1.57, 1, 'out'],
+        [0.74, -0.004, 0.13, -0.06, -1.2, 0, 1.57, 1],
+        [0.8, -0.1, -0.12, 0.06, -0.6, 0, 1.57, 1, 'in'],
+        [0.81, -0.1, -0.12, 0.06, -0.6, 0, 1.57, 0],
+        [1, -0.1, -0.12, 0.06, -0.6, 0, 1.57, 0],
+      ],
+    },
   },
   [Weapon.SHOTGUN]: {
     meta: VM.SHOTGUN,
-    hip: { pos: [0.12, -0.175, -0.22], rot: [0.03, 0.07, 0.06] },
-    ads: { pos: [0, -VM.SHOTGUN.sightY, -0.2], rot: [0, 0, 0] },
-    sprint: { pos: [0.05, -0.21, -0.24], rot: [-0.3, 0.85, 0.55] },
+    hip: { pos: [0.12, -0.125, -0.3], rot: [0.04, 0.2, 0.08] },
+    ads: { pos: [0, -VM.SHOTGUN.sightY, -0.35], rot: [0, 0, 0] },
+    sprint: { pos: [0.08, -0.135, -0.3], rot: [0.12, 0.9, 0.75] },
     hands: [
-      { pose: 'stock', side: 'R', pos: [0, 0, 0], rot: [0, 0, 0], arm: [0.34, -0.42, 0.84], roll: 0.1 },
-      { pose: 'support', side: 'L', onPivot: true, pos: sub(VM.SHOTGUN.support!, VM.SHOTGUN.pivot!), rot: [0, 0, 0], arm: [-0.3, -0.55, 0.78], roll: -0.2 },
+      { pose: 'stock', side: 'R', pos: [0, 0, 0], rot: VM.SHOTGUN.gripRot, roll: 0.1 },
+      // la main gauche tient la longuesse, solidaire des canons quand ils basculent
+      { pose: 'support', side: 'L', onPivot: true, pos: sub(VM.SHOTGUN.support!, VM.SHOTGUN.pivot!), rot: VM.SHOTGUN.supportRot, roll: -0.3 },
     ],
     recoil: { back: 0.075, climb: 0.2, up: 0.01, roll: 0.03 },
     pivot: [0, 0, 18 * S],
   },
   [Weapon.RIFLE]: {
     meta: VM.RIFLE,
-    hip: { pos: [0.12, -0.165, -0.21], rot: [0.03, 0.065, 0.06] },
-    ads: { pos: [0, -VM.RIFLE.sightY, -0.17], rot: [0, 0, 0] },
-    sprint: { pos: [0.05, -0.21, -0.24], rot: [-0.3, 0.85, 0.55] },
+    hip: { pos: [0.12, -0.12, -0.29], rot: [0.04, 0.19, 0.08] },
+    ads: { pos: [0, -VM.RIFLE.sightY, -0.31], rot: [0, 0, 0] },
+    sprint: { pos: [0.08, -0.135, -0.3], rot: [0.12, 0.9, 0.75] },
     hands: [
-      { pose: 'stock', side: 'R', pos: [0, 0, 0], rot: [0, 0, 0], arm: [0.34, -0.42, 0.84], roll: 0.1 },
-      { pose: 'support', side: 'L', pos: VM.RIFLE.support!, rot: [0, 0, 0], arm: [-0.28, -0.5, 0.82], roll: -0.2 },
+      { pose: 'stock', side: 'R', pos: [0, 0, 0], rot: VM.RIFLE.gripRot, roll: 0.1 },
+      { pose: 'support', side: 'L', pos: VM.RIFLE.support!, rot: VM.RIFLE.supportRot, roll: -0.3 },
     ],
     recoil: { back: 0.08, climb: 0.16, up: 0.012, roll: 0.025 },
     pivot: [0, 0, 18 * S],
   },
   [Weapon.KNIFE]: {
     meta: VM.KNIFE,
-    hip: { pos: [0.15, -0.2, -0.34], rot: [0.32, 0.3, -0.3] },
-    sprint: { pos: [0.13, -0.26, -0.3], rot: [-0.3, 0.55, -0.2] },
-    hands: [{ pose: 'blade', side: 'R', pos: [0, 0, 0], rot: [0, 0, 0], arm: [0.25, -0.62, 0.74], roll: 0.15 }],
+    hip: { pos: [0.125, -0.105, -0.33], rot: [0.32, 0.36, -0.35] },
+    sprint: { pos: [0.12, -0.2, -0.3], rot: [-0.3, 0.55, -0.2] },
+    hands: [{ pose: 'blade', side: 'R', pos: [0, 0, 0], rot: [0, 0, 0], roll: 0.15 }],
     recoil: { back: 0, climb: 0, up: 0, roll: 0 },
     pivot: [1 * S, 0, 3 * S],
   },
   [Weapon.CLUB]: {
     meta: VM.CLUB,
-    hip: { pos: [0.16, -0.21, -0.32], rot: [0.85, 0.26, -0.22] },
-    sprint: { pos: [0.14, -0.25, -0.3], rot: [0.25, 0.5, -0.3] },
-    hands: [{ pose: 'blade', side: 'R', pos: [0, 0, 0], rot: [0, 0, 0], arm: [0.2, -0.82, 0.54], roll: 0.15 }],
+    hip: { pos: [0.135, -0.115, -0.32], rot: [0.8, 0.28, -0.25] },
+    sprint: { pos: [0.13, -0.2, -0.3], rot: [0.25, 0.5, -0.3] },
+    hands: [{ pose: 'blade', side: 'R', pos: [0, 0, 0], rot: [0, 0, 0], roll: 0.15 }],
     recoil: { back: 0, climb: 0, up: 0, roll: 0 },
     pivot: [1 * S, 0, 3 * S],
   },
   [Weapon.FISTS]: {
+    // (pas de bouche de canon : les métadonnées du couteau ne servent que de valeur par défaut)
     meta: VM.KNIFE,
-    hip: { pos: [0.13, -0.165, -0.31], rot: [0.12, -0.12, 0.42] },
-    sprint: { pos: [0.13, -0.22, -0.27], rot: [-0.1, -0.1, 0.5] },
-    hands: [{ pose: 'fist', side: 'R', pos: [0, 0, 0], rot: [0, 0, 0], arm: [0.12, -0.42, 0.9], roll: 0 }],
+    hip: { pos: [0.11, -0.115, -0.33], rot: [0.0, -0.22, -0.5] },
+    sprint: { pos: [0.115, -0.14, -0.31], rot: [-0.2, -0.15, -0.8] },
+    hands: [{ pose: 'fist', side: 'R', pos: [0, 0, 0], rot: [0, 0, 0], roll: 0 }],
     recoil: { back: 0, climb: 0, up: 0, roll: 0 },
     pivot: [0, 0, 3 * S],
   },
@@ -131,9 +166,9 @@ const RIGS: Record<Weapon, RigDef> = {
 /** Poing gauche (garde de boxe : bras avant). */
 const FIST_L: RigDef = {
   meta: VM.KNIFE,
-  hip: { pos: [-0.12, -0.15, -0.37], rot: [0.14, 0.12, -0.42] },
-  sprint: { pos: [-0.13, -0.22, -0.28], rot: [-0.1, 0.1, -0.5] },
-  hands: [{ pose: 'fist', side: 'L', pos: [0, 0, 0], rot: [0, 0, 0], arm: [-0.12, -0.42, 0.9], roll: 0 }],
+  hip: { pos: [-0.1, -0.1, -0.38], rot: [0.0, 0.2, 0.5] },
+  sprint: { pos: [-0.11, -0.135, -0.33], rot: [-0.2, 0.15, 0.8] },
+  hands: [{ pose: 'fist', side: 'L', pos: [0, 0, 0], rot: [0, 0, 0], roll: 0 }],
   recoil: { back: 0, climb: 0, up: 0, roll: 0 },
   pivot: [0, 0, 3 * S],
 };
@@ -176,34 +211,34 @@ const RELOAD_KEYS: Partial<Record<Weapon, Key[]>> = {
   // tombent), on présente les chambres, on recharge, on referme d'un coup sec.
   [Weapon.REVOLVER]: [
     [0, 0, 0, 0, 0, 0, 0, 0],
-    [0.1, -0.07, 0.035, 0.02, 0.3, 0.3, 0.55, 0, 'io'],
-    [0.17, -0.07, 0.035, 0.02, 0.24, 0.32, 0.6, -1.2, 'out'],
-    [0.3, -0.06, 0.07, 0.04, 1.05, 0.2, 0.35, -1.25, 'io'],
-    [0.42, -0.08, 0.0, 0.03, -0.32, 0.38, 0.75, -1.2, 'io'],
-    [0.78, -0.08, 0.005, 0.03, -0.3, 0.36, 0.72, -1.2, 'io'],
-    [0.85, -0.05, 0.02, 0.0, 0.25, 0.22, 0.32, 0, 'out'],
+    [0.1, -0.06, 0.035, 0.0, 0.25, 0.45, -0.25, 0, 'io'],
+    [0.16, -0.06, 0.035, 0.0, 0.2, 0.47, -0.27, -1.25, 'out'],
+    [0.3, -0.05, 0.075, 0.02, 1.2, 0.35, -0.2, -1.25, 'io'],
+    [0.42, -0.02, -0.01, 0.0, -0.1, 0.3, 1.05, -1.2, 'io'],
+    [0.78, -0.02, -0.005, 0.0, -0.08, 0.28, 1.0, -1.2, 'io'],
+    [0.85, -0.04, 0.03, 0.0, 0.3, 0.3, -0.1, 0, 'out'],
     [1, 0, 0, 0, 0, 0, 0, 0, 'io'],
   ],
   // Fusil : on incline l'arme, les canons basculent (la main gauche suit), éjection, deux
   // cartouches, fermeture d'un coup de poignet.
   [Weapon.SHOTGUN]: [
     [0, 0, 0, 0, 0, 0, 0, 0],
-    [0.1, -0.035, -0.02, 0.03, -0.12, 0.28, 0.42, 0, 'io'],
-    [0.17, -0.04, -0.03, 0.03, -0.18, 0.3, 0.45, -0.5, 'out'],
-    [0.26, -0.05, -0.045, 0.04, -0.3, 0.34, 0.5, -0.52, 'io'],
-    [0.74, -0.05, -0.045, 0.04, -0.28, 0.34, 0.5, -0.52, 'io'],
-    [0.8, -0.03, -0.0, 0.02, 0.12, 0.24, 0.3, 0, 'out'],
+    [0.1, -0.05, 0.02, 0.03, 0.02, 0.3, 0.45, 0, 'io'],
+    [0.17, -0.055, 0.025, 0.03, -0.02, 0.32, 0.48, -0.5, 'out'],
+    [0.26, -0.06, 0.03, 0.04, -0.08, 0.34, 0.52, -0.52, 'io'],
+    [0.74, -0.06, 0.03, 0.04, -0.06, 0.34, 0.5, -0.52, 'io'],
+    [0.8, -0.03, 0.02, 0.02, 0.15, 0.24, 0.3, 0, 'out'],
     [1, 0, 0, 0, 0, 0, 0, 0, 'io'],
   ],
   // Martini-Henry : on penche la carabine, levier abaissé (le bloc tombe, la douille est
   // éjectée), on glisse la cartouche, levier relevé.
   [Weapon.RIFLE]: [
     [0, 0, 0, 0, 0, 0, 0, 0],
-    [0.12, -0.03, -0.02, 0.01, -0.1, 0.24, -0.38, 0, 'io'],
-    [0.2, -0.03, -0.03, 0.01, -0.14, 0.26, -0.42, 0.75, 'out'],
-    [0.3, -0.035, -0.035, 0.02, -0.2, 0.3, -0.46, 0.75, 'io'],
-    [0.7, -0.035, -0.035, 0.02, -0.18, 0.3, -0.46, 0.75, 'io'],
-    [0.78, -0.02, -0.01, 0.0, -0.05, 0.2, -0.25, 0, 'out'],
+    [0.12, -0.035, 0.03, 0.01, 0.12, 0.28, -0.85, 0, 'io'],
+    [0.2, -0.035, 0.03, 0.01, 0.1, 0.28, -0.9, 0.8, 'out'],
+    [0.3, -0.04, 0.025, 0.02, 0.05, 0.3, -0.92, 0.8, 'io'],
+    [0.7, -0.04, 0.025, 0.02, 0.06, 0.3, -0.9, 0.8, 'io'],
+    [0.78, -0.02, 0.01, 0.01, 0.05, 0.2, -0.45, 0, 'out'],
     [1, 0, 0, 0, 0, 0, 0, 0, 'io'],
   ],
 };
@@ -226,7 +261,7 @@ const SWING: Partial<Record<Weapon, { dur: number; keys: Key[] }>> = {
     dur: 0.52,
     keys: [
       [0, 0, 0, 0, 0, 0, 0, 0],
-      [0.24, 0.03, 0.15, 0.08, 0.95, -0.1, -0.2, 0, 'out'],
+      [0.24, 0.04, 0.075, 0.03, 1.05, -0.12, -0.2, 0, 'out'],
       [0.44, -0.09, -0.05, -0.15, -1.15, 0.28, 0.18, 0, 'in'],
       [0.58, -0.09, -0.06, -0.14, -1.2, 0.3, 0.2, 0, 'out'],
       [1, 0, 0, 0, 0, 0, 0, 0, 'io'],
@@ -237,9 +272,9 @@ const SWING: Partial<Record<Weapon, { dur: number; keys: Key[] }>> = {
     dur: 0.34,
     keys: [
       [0, 0, 0, 0, 0, 0, 0, 0],
-      [0.12, 0.012, -0.01, 0.035, 0, 0, 0.05, 0, 'out'],
-      [0.36, -0.1, 0.055, -0.27, -0.12, 0.18, 0.55, 0, 'out'],
-      [0.5, -0.1, 0.055, -0.26, -0.12, 0.18, 0.55, 0, 'lin'],
+      [0.12, 0.012, -0.012, 0.03, 0.05, 0, 0.05, 0, 'out'],
+      [0.36, -0.07, 0.06, -0.15, 0.2, 0.22, 0.5, 0, 'out'],
+      [0.5, -0.07, 0.06, -0.145, 0.2, 0.22, 0.5, 0, 'lin'],
       [1, 0, 0, 0, 0, 0, 0, 0, 'io'],
     ],
   },
@@ -255,7 +290,8 @@ class Spring {
     private c: number,
   ) {}
   step(dt: number, target = 0): void {
-    const n = dt > 0.017 ? 2 : 1;
+    // sous-pas : l'intégration reste stable même à bas régime d'images
+    const n = Math.max(1, Math.ceil(dt / 0.012));
     const h = dt / n;
     for (let i = 0; i < n; i++) {
       const a = -this.k * (this.x - target) - this.c * this.v;
@@ -325,6 +361,7 @@ export class Viewmodel {
   private e = new THREE.Euler(0, 0, 0, 'YXZ');
   private v = new THREE.Vector3();
   private v2 = new THREE.Vector3();
+  private up = new THREE.Vector3();
   private m4 = new THREE.Matrix4();
   private keyOut = [0, 0, 0, 0, 0, 0, 0];
   private mainFov = 75;
@@ -358,7 +395,7 @@ export class Viewmodel {
     for (const p of parts) root.add(p);
     if (moving) root.add(moving);
     this.root.add(root);
-    return { def, root, moving, rims, arms: [] };
+    return { def, root, moving, rims, arms: [], forearms: [], helper: null };
   }
 
   private buildWeapons(): void {
@@ -399,9 +436,9 @@ export class Viewmodel {
   }
 
   /** Orientation qui aligne +Z (axe de la manche) sur `dir`, +Y vers le haut, puis roulis. */
-  private armQuat(dir: V3, roll: number, out: THREE.Quaternion): THREE.Quaternion {
+  private armQuat(dir: V3, roll: number, out: THREE.Quaternion, up?: THREE.Vector3): THREE.Quaternion {
     const z = this.v.set(dir[0], dir[1], dir[2]).normalize();
-    const x = this.v2.set(0, 1, 0).cross(z);
+    const x = up ? this.v2.copy(up).cross(z) : this.v2.set(0, 1, 0).cross(z);
     if (x.lengthSq() < 1e-6) x.set(1, 0, 0);
     x.normalize();
     const y = new THREE.Vector3().crossVectors(z, x);
@@ -436,6 +473,7 @@ export class Viewmodel {
     for (const rig of [...this.rigs.values(), this.fistL]) {
       for (const o of rig.arms) o.removeFromParent();
       rig.arms = [];
+      rig.forearms = [];
       for (const slot of rig.def.hands) {
         const a = arm(slot.side, slot.pose);
         const parent = slot.onPivot && rig.moving ? rig.moving : rig.root;
@@ -446,9 +484,26 @@ export class Viewmodel {
         hand.scale.setScalar(1.015);
         const fore = this.mesh(a.foreGeo);
         fore.position.set(...a.wrist).applyEuler(hand.rotation).add(hand.position);
-        this.armQuat(slot.arm, slot.roll, fore.quaternion);
+        rig.forearms.push({ mesh: fore, slot, onMoving: parent !== rig.root });
         parent.add(hand, fore);
         rig.arms.push(hand, fore);
+      }
+      rig.helper = null;
+      const hd = rig.def.helper;
+      if (hd) {
+        const a = arm('L', hd.pose);
+        const hand = new THREE.Group();
+        const hm = this.mesh(a.handGeo);
+        hm.scale.setScalar(1.015);
+        const cart = this.mesh(this.casingGeo[hd.cartridge]);
+        cart.position.set(0.5 * S, 0, -3.5 * S);
+        hand.add(hm, cart);
+        const fore = this.mesh(a.foreGeo);
+        hand.visible = fore.visible = false;
+        rig.root.add(hand, fore);
+        rig.arms.push(hand, fore);
+        rig.helper = { hand, fore, wrist: new THREE.Vector3(...a.wrist) };
+        rig.forearms.push({ mesh: fore, slot: { pose: hd.pose, side: 'L', pos: [0, 0, 0], rot: [0, 0, 0], roll: 0 }, onMoving: false });
       }
     }
   }
@@ -458,8 +513,9 @@ export class Viewmodel {
   kick(n: number): void {
     const w = this.shown;
     const k = w === Weapon.REVOLVER ? 1 : 1.25;
-    this.kickPos.v += 9 * n;
-    this.kickRot.v += 7.5 * n * k;
+    // impulsions : la crête du ressort vaut ≈ 0,6 × n (recul arrière et relevé du canon)
+    this.kickPos.v += 30 * n;
+    this.kickRot.v += 16 * n * k;
     this.kickRoll = (Math.random() - 0.5) * 2;
   }
 
@@ -474,7 +530,7 @@ export class Viewmodel {
   // ---------------------------------------------------------------- animation
 
   update(dt: number, player: PlayerController, weapons: WeaponSystem, now: number): void {
-    dt = clamp(dt, 0, 0.05);
+    dt = clamp(dt, 0, 0.1);
     this.t += dt;
     this.weaponsRef = weapons;
     // --- changement d'arme : on baisse l'ancienne, on lève la nouvelle
@@ -499,7 +555,7 @@ export class Viewmodel {
     if (onGround) this.phase += dt * speed * ((Math.PI * 2) / 2.5);
     const bobTarget = onGround ? clamp(speed / 4.2, 0, 1.5) : 0;
     this.bobAmp += (bobTarget - this.bobAmp) * Math.min(1, dt * 8);
-    if (onGround && !this.wasGround) this.land.v -= clamp(-this.lastVy / 9, 0.25, 1.6) * 1.1;
+    if (onGround && !this.wasGround) this.land.v += clamp(-this.lastVy / 9, 0.25, 1.6) * 20;
     this.wasGround = onGround;
     this.lastVy = player.vel.y;
     this.land.step(dt);
@@ -557,17 +613,18 @@ export class Viewmodel {
     const sp = smooth01(this.sprintLin);
 
     // ------------------------------------------------ pose de l'arme principale
-    this.composePose(rig, a, sp, reloadT, false, now);
-    this.root.updateMatrixWorld(true);
-    if (w === Weapon.FISTS) this.composePose(this.fistL, 0, sp, -1, true, now);
+    this.composePose(rig, a, sp, reloadT, false);
+    if (w === Weapon.FISTS) this.composePose(this.fistL, 0, sp, -1, true);
 
-    // --- pièces mobiles et douilles
+    // --- pièces mobiles, bras, douilles
     this.updateParts(rig, w, reloadT);
+    this.solveArms(rig);
+    if (w === Weapon.FISTS) this.solveArms(this.fistL);
     this.updateCasings(dt);
   }
 
   /** Calcule la pose d'une arme (ou d'un poing) dans le repère de la caméra. */
-  private composePose(rig: Rig, a: number, sp: number, reloadT: number, isLeftFist: boolean, now: number): void {
+  private composePose(rig: Rig, a: number, sp: number, reloadT: number, isLeftFist: boolean): void {
     const def = rig.def;
     const w = this.shown;
     const hip = def.hip;
@@ -623,15 +680,16 @@ export class Viewmodel {
       py += f * 0.006 * (1 - sp);
       pz += f * 0.008 * (1 - sp);
     }
-    // --- inertie de visée
+    // --- inertie de visée : quand la vue tourne, l'arme reste un instant en arrière (elle
+    // glisse vers l'extérieur du virage, le canon pointe en retard) et s'incline dans le virage
     const swk = 1 - a * 0.6;
     const sy = this.swayYaw.x * swk;
     const spi = this.swayPitch.x * swk;
-    px -= sy * 0.24;
+    px += sy * 0.24;
     py -= spi * 0.2;
-    ry += sy * 0.9;
-    rz += sy * 0.6;
-    rx += spi * 0.8;
+    ry -= sy * 0.9;
+    rz += sy * 0.5;
+    rx -= spi * 0.8;
     // --- pas de côté : l'arme s'incline dans le sens du déplacement
     rz -= this.strafe * 0.05 * (1 - a * 0.6);
     px -= this.strafe * 0.006;
@@ -706,7 +764,46 @@ export class Viewmodel {
     }
     rig.root.position.copy(this.P);
     rig.root.quaternion.copy(this.Q);
-    void now;
+  }
+
+  /**
+   * Cinématique inverse à deux segments (épaule fixe dans le repère de la caméra, bras et
+   * avant-bras de longueur fixe, coude rejeté vers le bas et l'extérieur) : seul l'avant-bras
+   * est dessiné, orienté du poignet vers le coude calculé.
+   */
+  private solveArms(rig: Rig): void {
+    const Lu = 0.3;
+    const Lf = VM.FOREARM_LENGTH;
+    for (const f of rig.forearms) {
+      if (!f.mesh.visible) continue;
+      const left = f.slot.side === 'L';
+      // repère (dans la caméra) du porteur de l'avant-bras : l'arme ou sa pièce mobile
+      const qp = this.q2.copy(rig.root.quaternion);
+      const tp = this.P.copy(rig.root.position);
+      if (f.onMoving && rig.moving) {
+        tp.add(this.v.copy(rig.moving.position).applyQuaternion(qp));
+        qp.multiply(rig.moving.quaternion);
+      }
+      const wrist = this.v.copy(f.mesh.position).applyQuaternion(qp).add(tp);
+      const sh = f.slot.shoulder ?? (left ? SHOULDER_L : SHOULDER_R);
+      const po = f.slot.pole ?? (left ? POLE_L : POLE_R);
+      const D = this.v2.set(wrist.x - sh[0], wrist.y - sh[1], wrist.z - sh[2]);
+      const d = clamp(D.length(), 0.05, Lu + Lf - 1e-3);
+      D.normalize();
+      const cosA = clamp((Lu * Lu + d * d - Lf * Lf) / (2 * Lu * d), -1, 1);
+      const sinA = Math.sqrt(1 - cosA * cosA);
+      // direction du coude : le pôle, rendu perpendiculaire à l'axe épaule → poignet
+      const pv = this.up.set(po[0], po[1], po[2]);
+      pv.addScaledVector(D, -pv.dot(D)).normalize();
+      const ex = sh[0] + Lu * (cosA * D.x + sinA * pv.x);
+      const ey = sh[1] + Lu * (cosA * D.y + sinA * pv.y);
+      const ez = sh[2] + Lu * (cosA * D.z + sinA * pv.z);
+      // direction poignet → coude, puis « haut » de la caméra, exprimés dans le repère du porteur
+      const qi = qp.invert();
+      const dir = this.v2.set(ex - wrist.x, ey - wrist.y, ez - wrist.z).applyQuaternion(qi);
+      const up = this.up.set(0, 1, 0).applyQuaternion(qi);
+      this.armQuat([dir.x, dir.y, dir.z], f.slot.roll, f.mesh.quaternion, up);
+    }
   }
 
   /** Pièces mobiles (bascule, levier) et éjection des douilles selon l'avancement du rechargement. */
@@ -717,6 +814,19 @@ export class Viewmodel {
       ang = this.keyOut[6];
     }
     if (rig.moving) rig.moving.rotation.x = ang;
+    const hp = rig.helper;
+    const hk = rig.def.helper?.keys;
+    if (hp && hk) {
+      const ko = this.keyOut;
+      if (reloadT >= 0) sampleKeys(hk, reloadT, ko);
+      const on = reloadT >= 0 && ko[6] > 0.5;
+      hp.hand.visible = hp.fore.visible = on;
+      if (on) {
+        hp.hand.position.set(ko[0], ko[1], ko[2]);
+        hp.hand.rotation.set(ko[3], ko[4], ko[5]);
+        hp.fore.position.copy(hp.wrist).applyEuler(hp.hand.rotation).add(hp.hand.position);
+      }
+    }
     const ev = this.reloadEvents;
     const fire = (name: string, at: number, fn: () => void) => {
       if (reloadT >= at && !ev.has(name)) {

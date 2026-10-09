@@ -308,6 +308,7 @@ export function startVmGallery(root: HTMLElement): void {
   const bar = document.createElement('div');
   bar.style.cssText = 'position:fixed;left:10px;bottom:10px;display:flex;flex-wrap:wrap;gap:4px;max-width:520px;pointer-events:auto;';
   root.appendChild(bar);
+  if (params.has('noui')) bar.style.display = info.style.display = 'none';
   const button = (label: string, fn: () => void) => {
     const b = document.createElement('button');
     b.textContent = label;
@@ -486,6 +487,25 @@ function startInspect(renderer: THREE.WebGLRenderer, which: string): void {
     knife: () => new THREE.Mesh(meshModel(VM.knifeModel()), mat),
     club: () => new THREE.Mesh(meshModel(VM.clubModel()), mat),
   };
+  // arme + main(s) dans leur repère commun (comme en jeu)
+  const withHands = (name: string, slots: [VM.HandPose, 'R' | 'L', [number, number, number], [number, number, number]][], boss: 'dadou' | 'even') => {
+    groups[`${name}+${boss}`] = () => {
+      const g = groups[name]();
+      for (const [pose, side, pos, rot] of slots) {
+        const a = VM.armModels(side, pose, look(boss));
+        const h = new THREE.Mesh(meshModel(a.hand), mat);
+        h.position.set(...pos);
+        h.rotation.set(...rot);
+        g.add(h);
+      }
+      return g;
+    };
+  };
+  for (const boss of ['dadou', 'even'] as const) {
+    withHands('revolver', [['pistol', 'R', [0, 0, 0], VM.REVOLVER.gripRot]], boss);
+    withHands('knife', [['blade', 'R', [0, 0, 0], [0, 0, 0]]], boss);
+    withHands('club', [['blade', 'R', [0, 0, 0], [0, 0, 0]]], boss);
+  }
   for (const pose of ['pistol', 'stock', 'support', 'fist', 'blade'] as VM.HandPose[]) {
     for (const boss of ['dadou', 'even'] as const) {
       groups[`${pose}-${boss}`] = () => {

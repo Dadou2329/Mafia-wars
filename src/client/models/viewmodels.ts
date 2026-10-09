@@ -20,13 +20,14 @@ export type Vec3 = [number, number, number];
 // ------------------------------------------------------------------ palette
 
 /** Acier bleui : base, faces éclairées, arêtes polies, ombres. */
-const BLUE = 0x30353f;
-const BLUE_HI = 0x4a5364;
-const BLUE_EDGE = 0x7d899c;
-const BLUE_DK = 0x1d2027;
-/** Barillet (acier un peu plus clair, usé aux arêtes) et cannelures. */
-const CYL = 0x3d4453;
-const CYL_DK = 0x1f232b;
+const BLUE = 0x2e333d;
+const BLUE_HI = 0x4d586b;
+const BLUE_EDGE = 0x8a99ae;
+const BLUE_DK = 0x1b1e25;
+/** Barillet (acier poli plus clair, reflets) et cannelures. */
+const CYL = 0x4b5466;
+const CYL_HI = 0x66728a;
+const CYL_DK = 0x232730;
 const BORE = 0x0b0c0f;
 /** Acier jaspé (trempé en paquet) des platines du fusil. */
 const CASE = [0x4a4c55, 0x5d5446, 0x3a4152, 0x6e6450, 0x2f323a];
@@ -44,9 +45,9 @@ const BLADE = 0xa9afb8;
 const BLADE_HI = 0xd3d9e0;
 const BLADE_DK = 0x8c929b;
 const EDGE = 0xeef2f6;
-/** Corne de cerf (manche du couteau). */
-const STAG = 0xb3a083;
-const STAG_DK = 0x86765e;
+/** Palissandre (manche du couteau). */
+const ROSEWOOD = 0x5b3322;
+const ROSEWOOD_DK = 0x43241a;
 /** Bois laqué de la matraque, cuir. */
 const LACQUER = 0x3b2417;
 const LACQUER_HI = 0x5a3a25;
@@ -165,7 +166,7 @@ function woodGrain(y: number, z: number, slope: number): number {
 // ------------------------------------------------------------------ métadonnées
 
 export interface VmWeaponMeta {
-  /** Bouche du canon (m). Pour le fusil : canon droit (premier coup). */
+  /** Bouche du canon (m) ; pointe de la lame ou bout de la matraque pour les armes blanches. Fusil : canon droit (premier coup). */
   muzzle: Vec3;
   /** Bouche du second canon (fusil juxtaposé, canon gauche). */
   muzzle2?: Vec3;
@@ -226,15 +227,15 @@ export function revolverModels(): RevolverModels {
   // étrier du verrou au-dessus de la bande supérieure, oreilles du cran de mire
   f.fill(-1, 1, 5, 6, -1, 0, BLUE);
   f.paint(-1, 1, 6, 6, -1, 0, BLUE_HI);
-  f.set(-1, 7, -1, BLUE_EDGE).set(1, 7, -1, BLUE_EDGE);
+  f.set(-1, 7, -1, BLUE_HI).set(1, 7, -1, BLUE_HI);
   // levier du verrou côté gauche (sous le pouce)
-  f.fill(-2, -2, 4, 5, -1, 0, BLUE_EDGE);
+  f.fill(-2, -2, 4, 5, -1, -1, BLUE_HI);
   f.set(-2, 3, 0, BLUE_HI);
-  // talon de la carcasse derrière le chien (attache de la crosse)
-  f.fill(-1, 1, 1, 2, 1, 2, BLUE);
+  // talon de la carcasse sous le chien (attache de la crosse, caché par la palmure)
+  f.fill(-1, 1, 1, 2, 1, 1, BLUE);
   // chien : corps, crête quadrillée
   f.fill(0, 0, 3, 5, 1, 1, BLUE);
-  f.set(0, 6, 1, BLUE_HI).set(0, 6, 2, BLUE_EDGE);
+  f.set(0, 6, 1, BLUE_HI).set(0, 6, 2, BLUE_HI);
   // pontet et détente
   f.fill(0, 0, -1, 0, -5, -5, BLUE);
   f.fill(0, 0, -1, -1, -5, -1, BLUE);
@@ -254,6 +255,7 @@ export function revolverModels(): RevolverModels {
   b.set(0, 2, -5, BLUE_DK); // crochet de charnière
   // barillet (cannelé : les arêtes sombres suggèrent les cannelures)
   b.fill(-1, 1, 2, 4, -4, -2, CYL);
+  // cannelures (arêtes du milieu, en creux) et reflets sur le haut du barillet
   for (const [x, y] of [
     [-1, 2],
     [1, 2],
@@ -262,6 +264,8 @@ export function revolverModels(): RevolverModels {
   ]) {
     b.set(x, y, -3, CYL_DK);
   }
+  b.set(-1, 4, -4, CYL_HI).set(-1, 4, -2, CYL_HI).set(1, 4, -4, CYL_HI).set(1, 4, -2, CYL_HI);
+  b.set(0, 2, -3, CYL_DK);
   b.pivot(0, 1.5, -5);
 
   // --- culots des cartouches + étoile d'extraction (derrière le barillet)
@@ -272,20 +276,15 @@ export function revolverModels(): RevolverModels {
   r.pivot(0, 1.5, -5);
 
   // --- crosse (repère main : axe de la poignée selon +Y, largeur paire centrée)
-  const g = new Grid(-1, 0, -7, 2, -1, 3, [0, 0.5, 0.5]);
+  const g = new Grid(-1, 0, -6, 2, -1, 3, [0, 0.5, 0.5]);
   g.fill(-1, 0, -3, 2, -1, 1, WALNUT);
   g.paint(-1, 0, -3, 2, -1, -1, WALNUT_LT);
   g.paint(-1, 0, -3, 2, 1, 1, WALNUT_DK);
-  // dos de carcasse visible au-dessus de la main
-  g.fill(-1, 0, 1, 2, 1, 1, BLUE);
-  // bec d'oiseau : la crosse se recourbe vers l'arrière, calotte d'acier
-  g.fill(-1, 0, -4, -4, 0, 2, WALNUT);
-  g.set(-1, -4, 0, WALNUT_LT).set(0, -4, 0, WALNUT_LT);
-  g.fill(-1, 0, -5, -5, 1, 2, BLUE);
-  g.set(-1, -5, 2, BLUE_HI).set(0, -5, 2, BLUE_HI);
-  // anneau de dragonne
-  g.set(-1, -6, 1, BLUE_EDGE).set(-1, -6, 3, BLUE_EDGE);
-  g.fill(-1, -1, -7, -7, 1, 3, BLUE_EDGE);
+  // bec d'oiseau : la crosse se recourbe vers l'arrière sous l'auriculaire, calotte d'acier
+  g.fill(-1, 0, -4, -4, 0, 2, BLUE);
+  g.set(-1, -4, 0, BLUE_HI).set(0, -4, 0, BLUE_HI);
+  // anneau de dragonne (petit étrier pendant)
+  g.set(-1, -5, 1, BLUE_EDGE).set(-1, -5, 2, BLUE_EDGE).set(-1, -6, 2, BLUE_HI);
   return { frame: f.m, barrel: b.m, rims: r.m, grip: g.m };
 }
 
@@ -306,7 +305,7 @@ export const SHOTGUN: VmWeaponMeta = {
   muzzle2: [-1 * R, 3 * R, -46.5 * R],
   support: [0, 1 * R, -16 * R],
   supportRot: [0, 0, 0],
-  gripRot: [0.12, 0, 0],
+  gripRot: [0, 0, 0],
   sightY: 5.5 * R,
   rearSightZ: -3 * R,
   frontSightZ: -45 * R,
@@ -419,7 +418,7 @@ export const RIFLE: VmWeaponMeta = {
   muzzle: [0, 2 * R, -63.5 * R],
   support: [0, 1 * R, -26 * R],
   supportRot: [0, 0, 0],
-  gripRot: [0.12, 0, 0],
+  gripRot: [0, 0, 0],
   sightY: 4.5 * R,
   rearSightZ: -19 * R,
   frontSightZ: -62 * R,
@@ -433,7 +432,6 @@ export function rifleModels(): RifleModels {
   s.fill(-1, 1, -1, 3, -11, -1, BLUE);
   s.set(-1, -1, -11, -1).set(1, -1, -11, -1).set(0, -1, -11, BLUE_DK);
   s.paint(-1, 1, 3, 3, -11, -1, BLUE_HI);
-  s.paint(-1, -1, 0, 2, -10, -2, (x, y, z) => (y === 2 && z % 3 === 0 ? BLUE_HI : BLUE));
   // auge de chargement : le dessus du bloc apparaît entre les flasques
   s.fill(0, 0, 3, 3, -9, -3, -1);
   s.fill(0, 0, 2, 2, -9, -3, BLUE_DK);
@@ -515,13 +513,14 @@ export const KNIFE: VmWeaponMeta = {
   length: 21 * R,
 };
 
-/** Couteau Bowie de Sheffield : lame à contre-tranchant et gorge, garde de laiton, manche en corne de cerf. */
+/** Couteau Bowie de Sheffield : lame à contre-tranchant et gorge, garde de laiton, manche de palissandre riveté. */
 export function knifeModel(): VoxelModel {
   // largeur 1, hauteur paire autour de l'origine (centre du manche entre les rangées -1 et 0)
   const g = new Grid(0, 0, -3, 2, -17, 5, [0.5, 0, 0.5]);
-  // manche en corne de cerf, rainures sombres
-  g.fill(0, 0, -1, 0, -3, 3, STAG);
-  g.paint(0, 0, -1, 0, -3, 3, (x, y, z) => ((z + y * 2 + 8) % 3 === 0 ? STAG_DK : STAG));
+  // manche de palissandre veiné, rivets de laiton
+  g.fill(0, 0, -1, 0, -3, 3, ROSEWOOD);
+  g.paint(0, 0, -1, -1, -3, 3, ROSEWOOD_DK);
+  g.set(0, 0, 2, BRASS).set(0, 0, -1, BRASS_DK);
   // pommeau et mitre de laiton
   g.fill(0, 0, -1, 0, 4, 4, BRASS);
   g.set(0, 0, 4, BRASS_HI);
@@ -572,8 +571,11 @@ export function clubModel(): VoxelModel {
     g.fill(-1, 1, 0, 0, z, z, c);
     g.fill(0, 0, -1, 1, z, z, c);
   };
-  // poignée gainée de cuir (dans le poing) et pommeau tourné
-  for (let z = -3; z <= 3; z++) round(z, (z & 1) === 0 ? LEATHER : LEATHER_HI);
+  // poignée gainée de cuir (fine là où le poing la serre) et pommeau tourné
+  for (let z = -3; z <= 3; z++) {
+    if (z >= -2 && z <= 1) g.set(0, 0, z, LEATHER);
+    else round(z, (z & 1) === 0 ? LEATHER : LEATHER_HI);
+  }
   g.fill(-1, 1, -1, 1, 4, 5, LACQUER);
   g.paint(-1, 1, 1, 1, 4, 5, LACQUER_HI);
   g.set(0, 0, 6, LACQUER_HI);
@@ -582,7 +584,7 @@ export function clubModel(): VoxelModel {
   for (let z = -20; z <= -15; z++) {
     g.set(-1, 1, z, LACQUER).set(1, 1, z, LACQUER).set(-1, -1, z, LACQUER).set(1, -1, z, LACQUER);
   }
-  g.paint(-1, 1, 1, 1, -22, 5, LACQUER_HI);
+  g.paint(-1, 1, 1, 1, -22, -4, LACQUER_HI);
   g.set(0, 0, -23, LACQUER_HI);
   // gorge tournée au-dessus de la poignée
   round(-4, 0x2a190f);
@@ -638,24 +640,24 @@ function handPalette(look: ArmLook): HandPalette {
   if (look.glove) {
     return {
       s: b,
-      a: shade(b, 0.82),
-      h: mix(b, 0x8a7a6a, 0.22),
-      d: shade(b, 0.7),
-      n: mix(b, 0x8a7a6a, 0.12),
+      a: shade(b, 0.78),
+      h: mix(b, 0x9a8a78, 0.32),
+      d: shade(b, 0.68),
+      n: mix(b, 0x9a8a78, 0.2),
       g: b,
-      k: mix(b, 0xb8a890, 0.3),
-      w: mix(b, 0x8a7a6a, 0.12),
+      k: mix(b, 0xc8b496, 0.38),
+      w: mix(b, 0x9a8a78, 0.16),
     };
   }
   return {
     s: b,
-    a: shade(b, 0.9),
-    h: shade(b, 1.08),
-    d: shade(b, 0.8),
-    n: mix(b, 0xf6ded2, 0.55),
+    a: shade(b, 0.87),
+    h: shade(b, 1.1),
+    d: shade(b, 0.74),
+    n: mix(b, 0xfbe4dc, 0.6),
     g: look.accent,
     k: b,
-    w: shade(b, 0.95),
+    w: shade(b, 0.93),
   };
 }
 
@@ -667,13 +669,15 @@ function handPalette(look: ArmLook): HandPalette {
 function pistolHand(pal: HandPalette): { m: VoxelModel; wrist: Vec3 } {
   const g = new Grid(-2, 2, -3, 2, -3, 3, [0, 0.5, 0.5]);
   const L = (y: number, rows: string[]) => g.layer(y, -2, -3, rows, pal);
-  // colonnes x : -2 (pouce, éminence), -1 0 (poignée), 1 (doigts/paume), 2 (dos de la main)
-  L(2, ['.....', 'n....', 's....', 's....', 's..s.', '.sss.', '.....']); // pouce, palmure
-  L(1, ['.....', '..sh.', 's..s.', 's..sh', 's..ss', '.ssss', '.....']); // index sur la détente
-  L(0, ['.....', 'nssh.', 's..s.', 's..sh', 's..sk', '.ssss', '.sss.']); // majeur
-  L(-1, ['.....', 'naah.', 's..a.', 's..ah', 's..ak', '.ssss', '.sss.']); // annulaire
-  L(-2, ['.....', '.ssh.', 's..g.', 's..sh', 's..sk', '.ssss', '.sss.']); // auriculaire (chevalière)
-  L(-3, ['.....', '.....', '.....', '...s.', 's..ss', '.ssss', '.....']); // tranche de la main
+  // colonnes x : -2 (pouce, bouts des doigts), -1 0 (poignée), 1 (phalanges, paume), 2 (dos de la main)
+  // rangées z : -3 (devant) … 3 (poignet) ; entre les bouts des doigts et l'éminence du pouce,
+  // le noyer de la crosse reste visible
+  L(2, ['n....', 's....', 's....', 'sss..', 'ssss.', '.hhs.', '.....']); // pouce le long de la carcasse, palmure
+  L(1, ['.....', '..sh.', 'n..s.', 's..sh', 's..ss', '.hssa', '.....']); // index sur la détente
+  L(0, ['.....', 'nssh.', 'n..sh', '...ss', 'h..ss', '.hssa', '.sss.']); // majeur
+  L(-1, ['.....', 'naah.', 'n..ah', '...ak', 's..as', '.ssaa', '.sss.']); // annulaire
+  L(-2, ['.....', '.nsh.', '.n.gh', '...ss', 's..sk', '.ssaa', '.ss..']); // auriculaire (chevalière)
+  L(-3, ['.....', '.....', '.....', '...s.', '...sa', '..sa.', '.....']); // tranche de la main
   return { m: g.m, wrist: g.p(0, -1, 3.5) };
 }
 
@@ -684,13 +688,14 @@ function pistolHand(pal: HandPalette): { m: VoxelModel; wrist: Vec3 } {
 function stockHand(pal: HandPalette): { m: VoxelModel; wrist: Vec3 } {
   const g = new Grid(-2, 3, -3, 2, -4, 4);
   const L = (y: number, rows: string[]) => g.layer(y, -2, -4, rows, pal);
-  // colonnes x : -2 (bouts des doigts), -1..1 (poignet), 2 (paume/phalanges), 3 (dos de la main)
-  L(2, ['......', '......', '.nsss.', '...ss.', '....ss', '....ss', '......', '......', '......']);
-  L(1, ['......', '......', '....h.', 'n...hs', 'n...hs', '....hs', '....ss', '....s.', '......']);
-  L(0, ['......', '......', '....ss', 's...ss', 'a...ak', 's...sk', '....ss', '....ss', '......']);
-  L(-1, ['......', '......', '....s.', 's...ss', 'a...ak', '....sk', '....ss', '....ss', '......']);
+  // colonnes x : -2 (bouts des doigts), -1..1 (poignet de crosse), 2 (paume, phalanges), 3 (dos de la main)
+  // rangées z : -4 (index sur la détente) … 4 (poignet) ; le pouce passe par-dessus
+  L(2, ['......', '......', '.nssh.', '....hs', '....hs', '....hs', '....s.', '......', '......']);
+  L(1, ['......', '......', '....ss', 'n...ss', 'n...ss', '....sk', '....ss', '....s.', '......']);
+  L(0, ['......', '......', '....ss', 's...ss', 'a...as', '....sk', '....ss', '....ss', '......']);
+  L(-1, ['......', '......', '....s.', 's...s.', 'a...a.', '....s.', '....ss', '....ss', '......']);
   L(-2, ['..ns..', '...h..', '...ss.', '.ssh..', '.aah..', '.ssh..', '......', '......', '......']);
-  L(-3, ['......', '......', '......', '..s...', '..a...', '......', '......', '......', '......']);
+  L(-3, ['......', '......', '......', '..d...', '..d...', '......', '......', '......', '......']);
   return { m: g.m, wrist: g.p(2.5, -0.5, 3.5) };
 }
 
@@ -701,11 +706,13 @@ function stockHand(pal: HandPalette): { m: VoxelModel; wrist: Vec3 } {
 function supportHand(pal: HandPalette): { m: VoxelModel; wrist: Vec3 } {
   const g = new Grid(-2, 2, -3, 2, -4, 3);
   const L = (y: number, rows: string[]) => g.layer(y, -2, -4, rows, pal);
-  L(1, ['.....', 'n....', 's...n', '....n', '....n', '.....', '.....', '.....']);
-  L(0, ['.....', 's....', 's...s', 's...a', 's...s', '....a', '.....', '.....']);
-  L(-1, ['.....', '.....', 's...h', 's...h', 's...h', 's...h', 's....', '.....']);
-  L(-2, ['.....', '.....', 'ssass', 'sssak', 'ssass', 'sssa.', 'sss..', '.ss..']);
-  L(-3, ['.....', '.....', '..hhh', '.sssh', '.sssh', 'ssss.', 'sss..', '.ss..']);
+  // colonnes x : -2 (pouce couché le long du flanc gauche), -1..1 (longuesse), 2 (doigts remontant à droite)
+  // rangées z : -4 (devant) … 3 (poignet)
+  L(1, ['.....', '.....', '....n', '....n', '....n', '.....', '.....', '.....']);
+  L(0, ['.....', 'n....', '....s', '....a', '....s', '....n', '.....', '.....']);
+  L(-1, ['.....', '.....', 's...a', 's...s', 's...a', 's...s', '.....', '.....']);
+  L(-2, ['.....', '.....', '.sssh', 'ssssh', 'ssssh', 'sssss', 'sss..', '.ss..']);
+  L(-3, ['.....', '.....', '..ddd', '.dddd', '.ddkd', '.ddd.', '.ss..', '.ss..']);
   return { m: g.m, wrist: g.p(-0.5, -2.5, 3.5) };
 }
 
@@ -716,10 +723,10 @@ function supportHand(pal: HandPalette): { m: VoxelModel; wrist: Vec3 } {
 function fistHand(pal: HandPalette): { m: VoxelModel; wrist: Vec3 } {
   const g = new Grid(-2, 2, -2, 2, -4, 3);
   const L = (y: number, rows: string[]) => g.layer(y, -2, -4, rows, pal);
-  L(1, ['.....', '.hhgh', '.ssss', '.skss', '.ssss', '..ss.', '..ss.', '.....']);
-  L(0, ['.....', '.sasa', 'sssss', 'sssss', 'sssss', '.ssss', '.sss.', '.....']);
-  L(-1, ['.....', '.snsa', 'ssasa', '.ssss', '.ssss', '..ss.', '..ss.', '.....']);
-  L(-2, ['.....', '.....', '.dddd', '..ddd', '.....', '.....', '.....', '.....']);
+  // colonnes x : -2 (pouce), -1 index, 0 majeur, 1 annulaire, 2 auriculaire ; rangées z : -4 … 3
+  L(1, ['.....', '.hhhg', '.ssss', '.skss', '.ssss', '..ss.', '..ss.', '.....']);
+  L(0, ['.....', '.sasa', 'sssss', 'sssss', '.ssss', '.sss.', '.sss.', '.....']);
+  L(-1, ['.....', '.sn..', 'sdada', '.dddd', '.dddd', '..ss.', '..ss.', '.....']);
   return { m: g.m, wrist: g.p(0.5, 0, 2.5) };
 }
 
@@ -732,7 +739,7 @@ function bladeHand(pal: HandPalette): { m: VoxelModel; wrist: Vec3 } {
   const g = new Grid(-1, 2, -2, 1, -3, 3, [0.5, 0, 0.5]);
   const L = (y: number, rows: string[]) => g.layer(y, -1, -3, rows, pal);
   // colonnes x : -1 (bouts des doigts), 0 (manche), 1 (paume/phalanges), 2 (dos de la main)
-  L(1, ['....', 'nssh', '..sh', '..sh', '..gh', '...s', '....']);
+  L(1, ['....', 'nssh', '.ssh', '.ssh', '.ssh', '...s', '....']);
   L(0, ['....', 's.ss', 's.ss', 'a.ak', 's.ss', '..ss', '....']);
   L(-1, ['....', 's.ss', 'n.ss', 'n.as', '..ss', '..ss', '....']);
   L(-2, ['....', '.sh.', '.sh.', '.ah.', '.sh.', '....', '....']);
@@ -744,53 +751,42 @@ function bladeHand(pal: HandPalette): { m: VoxelModel; wrist: Vec3 } {
  * poignet, la manche s'étend selon +Z vers le coude ; le côté extérieur du bras est +X.
  */
 function forearmModel(look: ArmLook): VoxelModel {
-  const g = new Grid(-3, 3, -3, 3, -1, 20);
+  // section paire (6 × 6 pour la manche) : origine au coin commun des quatre voxels centraux
+  const g = new Grid(-3, 2, -3, 2, -1, 20, [0, 0, 0.5]);
   const pal = handPalette(look);
+  const ring = (z: number, r: number, c: number) => {
+    // octogone : carré de côté 2r privé de ses coins
+    g.fill(-r, r - 1, -r + 1, r - 2, z, z, c);
+    g.fill(-r + 1, r - 2, -r, r - 1, z, z, c);
+  };
   // poignet (sous la manchette)
-  g.fill(-1, 1, -1, 1, -1, 0, pal.w);
-  // manchette de chemise empesée (Even : manchette grise sous le bleu marine)
+  g.fill(-1, 0, -1, 0, -1, 0, pal.w);
+  // manchette de chemise empesée (Even : manchette gris perle sous le bleu marine)
   const cuff = look.cuff;
-  g.fill(-2, 2, -2, 2, 1, 2, cuff);
-  for (const [x, y] of [
-    [-2, -2],
-    [2, -2],
-    [-2, 2],
-    [2, 2],
-  ])
-    g.fill(x, x, y, y, 1, 2, -1);
-  g.paint(-2, 2, -2, 2, 1, 1, shade(cuff, 1.04));
-  g.paint(-2, 2, -2, -2, 1, 2, shade(cuff, 0.86));
+  ring(1, 2, cuff);
+  g.paint(-2, 1, -2, -2, 1, 1, shade(cuff, 0.86));
   // bouton de manchette (or pour Dadou, argent pour Even)
-  g.set(2, 0, 2, look.accent);
-  // manche : section octogonale 7 × 7, plis
+  g.set(1, 0, 1, look.accent);
+  // manche : section octogonale, lustre du drap dessus, ombre dessous
   const sl = look.sleeve;
-  const slHi = mix(sl, 0x9a9aa4, look.boss === 'dadou' ? 0.1 : 0.07);
+  const slHi = mix(sl, 0xa4a4b0, look.boss === 'dadou' ? 0.16 : 0.1);
   const slDk = shade(sl, 0.72);
-  for (let z = 3; z <= 20; z++) {
-    g.fill(-3, 3, -2, 2, z, z, sl);
-    g.fill(-2, 2, -3, 3, z, z, sl);
-  }
-  // dessus de manche un peu plus clair (lustre du drap), dessous plus sombre
-  g.paint(-2, 2, 3, 3, 3, 20, slHi);
-  g.paint(-2, 2, -3, -3, 3, 20, slDk);
+  for (let z = 2; z <= 20; z++) ring(z, 3, sl);
+  g.paint(-2, 1, 2, 2, 2, 20, slHi);
+  g.paint(-2, 1, -3, -3, 2, 20, slDk);
   // plis du drap au creux du coude
   for (const z of [11, 15, 18]) {
-    g.paint(-3, -3, -2, 2, z, z, slDk);
-    g.paint(-2, 2, -3, -3, z, z, shade(sl, 0.6));
-    g.set(-3, 2, z + 1, slHi);
+    g.paint(-3, -3, -2, 1, z, z, slDk);
+    g.paint(-2, 1, -3, -3, z, z, shade(sl, 0.6));
+    g.set(-3, 1, z + 1, slHi);
   }
-  g.set(-3, -1, 8, slDk).set(-3, 0, 7, slDk);
-  // parement : bord de la manche
+  // parement : bord de la manche (passepoil cramoisi de Dadou, revers bleu clair d'Even)
   const trim = look.trim;
-  g.paint(-3, 3, -3, 3, 3, 3, trim);
-  if (look.boss === 'dadou') {
-    // passepoil cramoisi et doublure visible au bord
-    g.paint(-3, 3, -3, 3, 4, 4, shade(sl, 1.25));
-  } else {
-    // redingote : revers de manche plus clair et trois boutons d'argent
-    g.paint(-3, 3, -3, 3, 4, 5, trim);
-    for (const z of [6, 8, 10]) g.set(3, 1, z, look.accent);
-    g.set(3, 1, 7, slHi);
+  g.paint(-3, 2, -3, 2, 2, 2, trim);
+  if (look.boss === 'even') {
+    g.paint(-3, 2, -3, 2, 3, 4, trim);
+    // trois boutons d'argent sur le côté extérieur
+    for (const z of [5, 7, 9]) g.set(2, 0, z, look.accent);
   }
   return g.m;
 }
@@ -830,15 +826,24 @@ export function armModels(side: 'R' | 'L', pose: HandPose, look: ArmLook): ArmMo
   return { hand, forearm: fore, wrist };
 }
 
-/** Tenue des bras d'un parrain à partir de sa tenue (couleurs de `appearanceFor`). */
+/**
+ * Drap vu de très près : on retire un peu de saturation (le rendu filmique pousse les
+ * bleus sombres vers un bleu électrique) en gardant la teinte choisie par le joueur.
+ */
+function cloth(c: number, k = 0.28): number {
+  const l = Math.round(((c >> 16) & 255) * 0.3 + ((c >> 8) & 255) * 0.59 + (c & 255) * 0.11);
+  return mix(c, (l << 16) | (l << 8) | l, k);
+}
+
+/** Tenue des bras d'un parrain à partir de sa tenue (couleurs de `appearanceFor`, personnalisation comprise). */
 export function armLookFor(boss: 'dadou' | 'even', outfit: { skin: number; coat: number; coat2: number; shirt: number; accent: number; vest: number }): ArmLook {
   if (boss === 'even') {
     return {
       boss,
       hand: 0x2a2420,
       glove: true,
-      sleeve: outfit.coat,
-      trim: outfit.coat2,
+      sleeve: cloth(outfit.coat),
+      trim: cloth(outfit.coat2),
       cuff: mix(outfit.shirt, outfit.vest, 0.25),
       accent: outfit.accent,
     };
@@ -847,8 +852,8 @@ export function armLookFor(boss: 'dadou' | 'even', outfit: { skin: number; coat:
     boss,
     hand: outfit.skin,
     glove: false,
-    sleeve: outfit.coat,
-    trim: outfit.coat2,
+    sleeve: cloth(outfit.coat),
+    trim: cloth(outfit.coat2, 0.12),
     cuff: outfit.shirt,
     accent: outfit.accent,
   };
