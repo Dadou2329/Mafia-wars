@@ -89,7 +89,8 @@ check('le 2e lieutenant de Dadou s’appelle Thomas Blake', g.privateState('dado
 const targetD = BUILDING_BY_KEY['chat_noir'].id;
 const targetE = BUILDING_BY_KEY['entrepot_morgan'].id;
 g.action('dadou', { a: 'order', lt: D.lieutenants[0], order: 'attack_building', target: targetD, men: 9 });
-g.action('even', { a: 'order', lt: E.lieutenants[0], order: 'attack_building', target: targetE, men: 5 });
+g.action('even', { a: 'recruit', n: 5 });
+g.action('even', { a: 'order', lt: E.lieutenants[0], order: 'attack_building', target: targetE, men: 9 });
 drain();
 const orderOk = events.filter((e) => e.t === 'order' && e.ok);
 check('les deux lieutenants accusent réception de l’ordre', orderOk.length === 2, JSON.stringify(orderOk.map((e) => (e as { text: string }).text)));

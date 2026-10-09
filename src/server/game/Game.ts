@@ -943,7 +943,9 @@ export class Game {
     let need = men - current.length;
     if (need <= 0) return;
     const lt = this.ents.get(sq.id)!;
-    const pool = this.poolMembers(sq.slot).sort((a, b) => Math.hypot(a.x - lt.x, a.z - lt.z) - Math.hypot(b.x - lt.x, b.z - lt.z));
+    const byDist = (a: Ent, b: Ent) => Math.hypot(a.x - lt.x, a.z - lt.z) - Math.hypot(b.x - lt.x, b.z - lt.z);
+    // d'abord les hommes qui attendent au QG, puis ceux qui escortent le parrain
+    const pool = [...this.poolMembers(sq.slot).sort(byDist), ...this.escortMembers(sq.slot).sort(byDist)];
     for (const e of pool) {
       if (need <= 0) break;
       e.ai!.mode = 'squad';
@@ -951,7 +953,7 @@ export class Game {
       sq.members.add(e.id);
       need--;
     }
-    if (need > 0) this.notify(sq.slot, `Pas assez d’hommes disponibles au QG : ${sq.name} part avec ${sq.members.size}.`, 'info', 'assign', 5);
+    if (need > 0) this.notify(sq.slot, `Pas assez d’hommes disponibles : ${sq.name} part avec ${sq.members.size}.`, 'info', 'assign', 5);
     this.reEmitSquad(sq);
   }
 

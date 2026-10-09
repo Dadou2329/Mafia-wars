@@ -178,6 +178,8 @@ npm run typecheck      # vérification TypeScript stricte
 npm test               # tests sans navigateur : génération, navigation, simulation complète
                        # (ordres → combats → captures), économie, événements, victoire, textes
 node tests/e2e.mjs     # test de bout en bout dans un vrai navigateur (Playwright)
+node tests/rematch.mjs # réseau : salon, reconnexion, pause, fin de partie, revanche
+                       # (serveur lancé avec MW_DEBUG=1)
 ```
 
 `tests/e2e.mjs` parcourt menu, salon, choix des parrains, partie, tir, roue des ordres, carte

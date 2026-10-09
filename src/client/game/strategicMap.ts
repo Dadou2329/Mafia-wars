@@ -984,7 +984,8 @@ export class StrategicMap {
 
   private maxMenFor(lt: LieutenantStatus | undefined): number {
     if (!lt) return 0;
-    return lt.men + this.gc.priv.pool;
+    // hommes du lieutenant + ceux qui attendent au QG + l'escorte du parrain
+    return lt.men + this.gc.priv.pool + this.gc.priv.escort;
   }
 
   private orderForm(p: Pending): HTMLElement {
@@ -1061,7 +1062,13 @@ export class StrategicMap {
       ),
     );
     form.appendChild(
-      h('div', { class: 'dim sm-small' }, lt ? `${lt.men} déjà avec ${lt.name}, ${gc.priv.pool} disponibles au QG.` : 'Choisissez un lieutenant.'),
+      h(
+        'div',
+        { class: 'dim sm-small' },
+        lt
+          ? `${lt.men} déjà avec ${lt.name}, ${gc.priv.pool} disponible${gc.priv.pool > 1 ? 's' : ''} au QG${gc.priv.escort ? `, ${gc.priv.escort} dans votre escorte (pris en dernier)` : ''}.`
+          : 'Choisissez un lieutenant.',
+      ),
     );
     if (p.order === 'attack_building' && typeof p.target === 'number') {
       const st = gc.pub.buildings[p.target];
