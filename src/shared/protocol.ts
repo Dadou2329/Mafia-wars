@@ -70,6 +70,8 @@ export interface PublicState {
   timeLeft: number; // s, -1 si illimité
   dayTime: number; // 0..1
   battles: { x: number; z: number; intensity: number }[];
+  /** Événement aléatoire public en cours (cargaison, descente de police, brouillard). */
+  event?: { kind: string; x: number; z: number; until: number } | null;
 }
 
 export interface LieutenantStatus {

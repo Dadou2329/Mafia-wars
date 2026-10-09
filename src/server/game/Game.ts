@@ -1575,6 +1575,10 @@ export class Game {
       timeLeft: this.settings.timeLimit > 0 ? Math.max(0, this.settings.timeLimit * 60 - this.time) : -1,
       dayTime: this.dayTime,
       battles: battles.filter((b) => b.intensity >= 2),
+      event:
+        this.activeEvent && this.activeEvent.kind !== 'informant'
+          ? { kind: this.activeEvent.kind, x: this.activeEvent.x, z: this.activeEvent.z, until: this.activeEvent.until }
+          : null,
     };
   }
 

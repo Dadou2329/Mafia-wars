@@ -520,6 +520,18 @@ export class GameClient {
       this.signs.setOwner(b.id, b.owner);
     }
     if (initial || !prev) this.dayTimeSmooth = p.dayTime;
+    // événement en cours (utile après une reconnexion, l'annonce ayant été manquée)
+    if (p.event && !this.activeEvent) {
+      this.activeEvent = { t: 'event', kind: p.event.kind, text: '', x: p.event.x, z: p.event.z, until: p.event.until };
+      if (p.event.kind === 'contraband') {
+        const y = this.world.nav.heightAt(p.event.x, p.event.z);
+        this.marker.show(p.event.x, Number.isFinite(y) ? y : 0, p.event.z);
+      }
+    } else if (p.event === null && this.activeEvent && this.activeEvent.kind !== 'informant') {
+      this.activeEvent = null;
+      this.marker.hide();
+      this.hud.setEvent(null);
+    }
     this.strategic.dirty = true;
   }
 
