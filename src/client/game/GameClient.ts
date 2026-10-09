@@ -662,6 +662,7 @@ export class GameClient {
     this.post.setEnabled(settings.bloom && settings.quality !== 'basse');
     this.post.setSize(window.innerWidth, window.innerHeight);
     this.myView.custom = settings.custom[this.you];
+    this.hud.setCrosshairStyle(settings.crosshair);
     this.viewmodel.setLook(this.you, settings.custom[this.you]);
     this.app.net.act({ a: 'customize', custom: settings.custom[this.you] });
     // les matériaux dépendent du nombre de lumières d'ombre : on force la mise à jour

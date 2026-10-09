@@ -223,6 +223,11 @@ export class Hud {
     }
   }
 
+  /** Style du réticule (point, croix, cercle) choisi dans les paramètres. */
+  setCrosshairStyle(style: string): void {
+    this.cross.className = `hud-cross ${style}`;
+  }
+
   setCrosshair(enemy: boolean, visible: boolean): void {
     this.cross.className = `hud-cross ${settings.crosshair}${enemy ? ' enemy' : ''}`;
     this.cross.style.display = visible ? '' : 'none';
