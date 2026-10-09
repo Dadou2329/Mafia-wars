@@ -20,13 +20,16 @@ export type Vec3 = [number, number, number];
 // ------------------------------------------------------------------ palette
 
 /** Acier bleui : base, faces éclairées, arêtes polies, ombres. */
-const BLUE = 0x2b2f38;
-const BLUE_HI = 0x434a58;
-const BLUE_EDGE = 0x6a7484;
-const BLUE_DK = 0x1c1f26;
+const BLUE = 0x30353f;
+const BLUE_HI = 0x4a5364;
+const BLUE_EDGE = 0x7d899c;
+const BLUE_DK = 0x1d2027;
+/** Barillet (acier un peu plus clair, usé aux arêtes) et cannelures. */
+const CYL = 0x3d4453;
+const CYL_DK = 0x1f232b;
 const BORE = 0x0b0c0f;
 /** Acier jaspé (trempé en paquet) des platines du fusil. */
-const CASE = [0x6a655d, 0x58606c, 0x7c705c, 0x4c4f58, 0x8a8478];
+const CASE = [0x4a4c55, 0x5d5446, 0x3a4152, 0x6e6450, 0x2f323a];
 /** Noyer. */
 const WALNUT = 0x5a3820;
 const WALNUT_LT = 0x6b4428;
@@ -39,7 +42,7 @@ const BRASS_HI = 0xe6c66e;
 /** Lame d'acier poli. */
 const BLADE = 0xa9afb8;
 const BLADE_HI = 0xd3d9e0;
-const BLADE_DK = 0x7b818b;
+const BLADE_DK = 0x8c929b;
 const EDGE = 0xeef2f6;
 /** Corne de cerf (manche du couteau). */
 const STAG = 0xb3a083;
@@ -151,6 +154,14 @@ function hash3(x: number, y: number, z: number): number {
   return (h ^ (h >>> 16)) >>> 0;
 }
 
+/** Veinage du noyer de crosse : bandes larges qui suivent la chute de la crosse. */
+function woodGrain(y: number, z: number, slope: number): number {
+  const v = y + Math.max(0, z - 6) * slope;
+  const k = ((Math.floor(v * 0.5 + 0.25) % 3) + 3) % 3;
+  const line = Math.abs(v - Math.round(v / 3) * 3) < 0.5 && z > 8;
+  return line ? WALNUT_DK : k === 0 ? WALNUT : k === 1 ? WALNUT_LT : WALNUT;
+}
+
 // ------------------------------------------------------------------ métadonnées
 
 export interface VmWeaponMeta {
@@ -195,7 +206,7 @@ export const REVOLVER: VmWeaponMeta = {
   muzzle: [0, 4 * R, -14.5 * R],
   support: null,
   supportRot: [0, 0, 0],
-  gripRot: [-0.4, 0, 0],
+  gripRot: [-0.32, 0, 0],
   sightY: 6.5 * R,
   rearSightZ: -1 * R,
   frontSightZ: -13 * R,
@@ -242,18 +253,15 @@ export function revolverModels(): RevolverModels {
   b.fill(0, 0, 3, 3, -7, -5, BLUE); // tenon d'éjecteur sous le canon
   b.set(0, 2, -5, BLUE_DK); // crochet de charnière
   // barillet (cannelé : les arêtes sombres suggèrent les cannelures)
-  b.fill(-1, 1, 2, 4, -4, -2, BLUE);
+  b.fill(-1, 1, 2, 4, -4, -2, CYL);
   for (const [x, y] of [
     [-1, 2],
     [1, 2],
     [-1, 4],
     [1, 4],
   ]) {
-    b.set(x, y, -3, BLUE_DK);
+    b.set(x, y, -3, CYL_DK);
   }
-  b.set(0, 4, -4, BLUE_HI).set(0, 4, -2, BLUE_HI);
-  b.set(-1, 3, -4, BLUE_HI).set(-1, 3, -2, BLUE_HI);
-  b.set(1, 3, -4, BLUE_HI).set(1, 3, -2, BLUE_HI);
   b.pivot(0, 1.5, -5);
 
   // --- culots des cartouches + étoile d'extraction (derrière le barillet)
@@ -264,20 +272,20 @@ export function revolverModels(): RevolverModels {
   r.pivot(0, 1.5, -5);
 
   // --- crosse (repère main : axe de la poignée selon +Y, largeur paire centrée)
-  const g = new Grid(-1, 0, -6, 2, -1, 3, [0, 0.5, 0.5]);
+  const g = new Grid(-1, 0, -7, 2, -1, 3, [0, 0.5, 0.5]);
   g.fill(-1, 0, -3, 2, -1, 1, WALNUT);
   g.paint(-1, 0, -3, 2, -1, -1, WALNUT_LT);
-  g.paint(-1, 0, -3, 2, 0, 0, (x, y) => ((y & 1) === 0 ? WALNUT : WALNUT_DK));
+  g.paint(-1, 0, -3, 2, 1, 1, WALNUT_DK);
   // dos de carcasse visible au-dessus de la main
   g.fill(-1, 0, 1, 2, 1, 1, BLUE);
-  // bec d'oiseau : la crosse se recourbe vers l'arrière
-  g.fill(-1, 0, -4, -3, 0, 2, WALNUT);
-  g.paint(-1, 0, -4, -4, 0, 2, GRAIN);
-  g.fill(-1, 0, -5, -5, 0, 2, BLUE); // calotte
+  // bec d'oiseau : la crosse se recourbe vers l'arrière, calotte d'acier
+  g.fill(-1, 0, -4, -4, 0, 2, WALNUT);
+  g.set(-1, -4, 0, WALNUT_LT).set(0, -4, 0, WALNUT_LT);
+  g.fill(-1, 0, -5, -5, 1, 2, BLUE);
   g.set(-1, -5, 2, BLUE_HI).set(0, -5, 2, BLUE_HI);
   // anneau de dragonne
-  g.set(-1, -6, 0, BLUE_EDGE).set(-1, -6, 2, BLUE_EDGE);
-  g.fill(-1, -1, -7, -7, 0, 2, BLUE_EDGE);
+  g.set(-1, -6, 1, BLUE_EDGE).set(-1, -6, 3, BLUE_EDGE);
+  g.fill(-1, -1, -7, -7, 1, 3, BLUE_EDGE);
   return { frame: f.m, barrel: b.m, rims: r.m, grip: g.m };
 }
 
@@ -317,7 +325,7 @@ function stockProfile(z: number, combDrop: number[], toe: number): [number, numb
 export function shotgunModels(): ShotgunModels {
   // --- carcasse + crosse
   const s = new Grid(-1, 1, -8, 5, -10, 21);
-  const caseCol = (x: number, y: number, z: number) => CASE[hash3(x + 7, y * 3, z * 5) % CASE.length];
+  const caseCol = (x: number, y: number, z: number) => CASE[hash3(x + 7, y >> 1, (z + 20) >> 1) % CASE.length];
   // barre de bascule (sous les canons) et corps
   s.fill(-1, 1, -1, 1, -9, -1, CASE[0]);
   s.paint(-1, 1, -1, 1, -9, -1, (x, y, z) => (x === 0 ? CASE[3] : caseCol(x, y, z)));
@@ -338,9 +346,9 @@ export function shotgunModels(): ShotgunModels {
   s.fill(0, 0, 3, 3, 0, 1, BLUE_EDGE);
   // chiens extérieurs : nez sur la broche, corps, crête recourbée
   for (const x of [-1, 1]) {
-    s.set(x, 3, -1, CASE[3]);
-    s.set(x, 3, 0, CASE[0]).set(x, 4, 0, CASE[0]);
-    s.set(x, 4, 1, CASE[4]).set(x, 5, 1, BLUE_EDGE);
+    s.set(x, 3, -1, CASE[2]);
+    s.set(x, 3, 0, CASE[0]);
+    s.set(x, 4, 0, CASE[3]).set(x, 4, 1, BLUE_EDGE);
   }
   // pontet et deux détentes
   s.set(0, -2, -7, BLUE);
@@ -355,13 +363,7 @@ export function shotgunModels(): ShotgunModels {
   }
   s.fill(-1, 1, -1, 1, 0, 3, WALNUT);
   // fil du noyer : veines obliques qui suivent la chute de la crosse
-  s.paint(-1, 1, -8, 1, 0, 20, (x, y, z, old) => {
-    if (old !== WALNUT) return old;
-    const v = Math.floor(y + z * 0.32 + (hash3(0, 0, z >> 2) & 1) * 0.5);
-    const k = ((v % 4) + 4) % 4;
-    return k === 0 ? WALNUT_DK : k === 2 ? WALNUT_LT : WALNUT;
-  });
-  s.paint(-1, 1, -8, 1, 13, 19, (x, y, z, old) => (old === WALNUT_DK && (y + z) % 5 === 0 ? GRAIN : old));
+  s.paint(-1, 1, -8, 1, 0, 20, (x, y, z, old) => (old === WALNUT ? woodGrain(y, z, 0.3) : old));
   {
     const [lo, hi] = stockProfile(20, [12, 18], 7);
     s.fill(-1, 1, lo, hi, 21, 21, BUTTPLATE);
@@ -373,7 +375,7 @@ export function shotgunModels(): ShotgunModels {
   for (let z = -46; z <= -3; z++) {
     for (const x of [-1, 1]) {
       const tw = ((z + (x > 0 ? 1 : 0)) >> 1) & 1;
-      b.set(x, 3, z, tw ? BLUE : 0x323743);
+      b.set(x, 3, z, tw ? BLUE : 0x353b47);
     }
   }
   b.fill(0, 0, 3, 3, -46, -3, BLUE_DK); // gouttière entre les tubes
@@ -390,7 +392,7 @@ export function shotgunModels(): ShotgunModels {
   b.fill(-1, 1, 0, 2, -21, -10, WALNUT_LT);
   b.fill(-1, 1, 0, 0, -21, -19, -1);
   b.fill(-1, -1, 1, 1, -21, -21, -1).fill(1, 1, 1, 1, -21, -21, -1);
-  b.paint(-1, 1, 0, 2, -21, -10, (x, y, z) => ((z + y * 3) % 7 === 0 ? WALNUT : (x + z) % 9 === 0 ? WALNUT_DK : WALNUT_LT));
+  b.paint(-1, 1, 0, 2, -21, -10, (x, y, z) => (y === 0 ? WALNUT : (z + 40) % 7 === 3 && y === 1 ? WALNUT : WALNUT_LT));
   b.fill(0, 0, 0, 0, -12, -10, BLUE_HI); // ferrure de verrouillage
   b.set(0, 1, -22, BLUE_EDGE); // poussoir Anson
   b.pivot(0, 1.5, -9);
@@ -447,7 +449,7 @@ export function rifleModels(): RifleModels {
   // --- longuesse : le canon repose dans le bois
   s.fill(-1, 1, 0, 1, -51, -12, WALNUT_LT);
   s.fill(-1, -1, 2, 2, -51, -12, WALNUT_LT).fill(1, 1, 2, 2, -51, -12, WALNUT_LT);
-  s.paint(-1, 1, 0, 2, -51, -12, (x, y, z) => ((z * 2 + y * 5 + (x & 1) * 3) % 11 === 0 ? WALNUT : (z + y) % 13 === 0 ? WALNUT_DK : WALNUT_LT));
+  s.paint(-1, 1, 0, 2, -51, -12, (x, y, z) => (y === 0 ? WALNUT : (z + 80) % 9 === 4 && y === 1 ? WALNUT : WALNUT_LT));
   s.fill(-1, 1, 0, 0, -51, -48, -1);
   s.fill(0, 0, 0, 0, -51, -48, WALNUT_LT);
   // grenadières (deux anneaux de fer) et embouchoir
@@ -479,12 +481,7 @@ export function rifleModels(): RifleModels {
     const [lo, hi] = z <= 5 ? [-1, 1] : stockProfile(z + 3, [12, 30], 7);
     s.fill(-1, 1, lo, hi, z, z, WALNUT);
   }
-  s.paint(-1, 1, -8, 1, 0, 17, (x, y, z, old) => {
-    if (old !== WALNUT) return old;
-    const v = Math.floor(y + z * 0.3 + (hash3(1, 0, z >> 2) & 1) * 0.5);
-    const k = ((v % 4) + 4) % 4;
-    return k === 0 ? WALNUT_DK : k === 2 ? WALNUT_LT : WALNUT;
-  });
+  s.paint(-1, 1, -8, 1, 0, 17, (x, y, z, old) => (old === WALNUT ? woodGrain(y, z + 3, 0.3) : old));
   {
     const [lo, hi] = stockProfile(20, [12, 30], 7);
     s.fill(-1, 1, lo, hi, 18, 18, BLUE);
@@ -570,35 +567,35 @@ export const CLUB: VmWeaponMeta = {
 
 /** Matraque de constable en bois tourné laqué, couronne peinte, dragonne de cuir. */
 export function clubModel(): VoxelModel {
-  const g = new Grid(-1, 1, -6, 1, -23, 6);
+  const g = new Grid(-1, 1, -5, 1, -23, 6);
   const round = (z: number, c: number) => {
     g.fill(-1, 1, 0, 0, z, z, c);
     g.fill(0, 0, -1, 1, z, z, c);
   };
-  // manche (dans le poing) et bouton de pommeau tourné
-  g.fill(0, 0, 0, 0, -3, 3, LACQUER);
-  round(4, LACQUER_HI);
-  g.fill(-1, 1, -1, 1, 5, 5, LACQUER);
+  // poignée gainée de cuir (dans le poing) et pommeau tourné
+  for (let z = -3; z <= 3; z++) round(z, (z & 1) === 0 ? LEATHER : LEATHER_HI);
+  g.fill(-1, 1, -1, 1, 4, 5, LACQUER);
+  g.paint(-1, 1, 1, 1, 4, 5, LACQUER_HI);
   g.set(0, 0, 6, LACQUER_HI);
-  // fût : section ronde (croix 3×3) s'épaississant vers le bout
-  for (let z = -22; z <= -3; z++) round(z, LACQUER);
-  for (let z = -20; z <= -14; z++) {
+  // fût : section ronde, renflé vers le bout, bout arrondi
+  for (let z = -22; z <= -4; z++) round(z, LACQUER);
+  for (let z = -20; z <= -15; z++) {
     g.set(-1, 1, z, LACQUER).set(1, 1, z, LACQUER).set(-1, -1, z, LACQUER).set(1, -1, z, LACQUER);
   }
   g.paint(-1, 1, 1, 1, -22, 5, LACQUER_HI);
   g.set(0, 0, -23, LACQUER_HI);
-  // gorges tournées près de la main
+  // gorge tournée au-dessus de la poignée
   round(-4, 0x2a190f);
-  round(-6, 0x2a190f);
-  // bande peinte : fond bleu nuit, couronne dorée
+  // bande peinte : fond bleu nuit, filets dorés, couronne sur le flanc
   for (let z = -11; z <= -8; z++) round(z, 0x1a2238);
   round(-12, BRASS_DK);
   round(-7, BRASS_DK);
-  g.set(-1, 0, -9, BRASS).set(-1, 0, -10, BRASS).set(0, 1, -9, BRASS_HI).set(1, 0, -10, BRASS).set(0, -1, -9, 0x8e1b22);
+  g.set(-1, 0, -10, BRASS).set(-1, 0, -9, BRASS_HI).set(1, 0, -10, BRASS).set(1, 0, -9, BRASS_HI);
   // dragonne de cuir pendant du pommeau
-  g.fill(0, 0, -5, -1, 5, 5, LEATHER);
-  g.fill(0, 0, -6, -6, 3, 5, LEATHER_HI);
-  g.fill(0, 0, -5, -2, 3, 3, LEATHER);
+  g.fill(0, 0, -3, -2, 5, 5, LEATHER);
+  g.fill(0, 0, -4, -4, 4, 5, LEATHER_HI);
+  g.set(0, -3, 3, LEATHER).set(0, -2, 3, LEATHER);
+  g.set(0, -5, 4, LEATHER_HI);
   return g.m;
 }
 

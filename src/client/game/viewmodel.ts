@@ -164,7 +164,10 @@ function sampleKeys(keys: Key[], t: number, out: number[]): void {
   const a = keys[i - 1];
   const b = keys[i];
   const u = ease(b[8], clamp((t - a[0]) / Math.max(1e-6, b[0] - a[0]), 0, 1));
-  for (let k = 1; k <= 7; k++) out[k - 1] = a[k] + (b[k] - a[k]) * u;
+  for (let k = 1; k <= 7; k++) {
+    const va = a[k] as number;
+    out[k - 1] = va + ((b[k] as number) - va) * u;
+  }
 }
 
 // Rechargements (t normalisé sur la durée de WEAPONS[w].reload).
