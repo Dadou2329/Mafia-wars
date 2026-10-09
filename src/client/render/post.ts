@@ -22,7 +22,7 @@ vec3 pick(vec2 uv) {
   vec3 c = texture2D(tSrc, uv).rgb;
   float br = max(c.r, max(c.g, c.b));
   // genou doux : seules les zones presque saturées contribuent
-  float w = smoothstep(uThreshold, uThreshold + 0.12, br);
+  float w = smoothstep(uThreshold, uThreshold + 0.07, br);
   // les lumières chaudes (lampes, feu) brillent davantage que le ciel gris
   float warm = clamp((c.r - c.b) * 2.0, 0.0, 1.0);
   return c * w * (0.35 + 0.65 * warm);
@@ -188,7 +188,7 @@ export class PostFX {
     try {
       r.copyFramebufferToTexture(this.frame);
       r.autoClear = false;
-      this.brightMat.uniforms.uThreshold.value = 0.9 - 0.12 * night;
+      this.brightMat.uniforms.uThreshold.value = 0.92 - 0.07 * night;
       this.pass(this.brightMat, this.frame, this.size.x, this.size.y, this.rts[0]);
       for (let i = 1; i < LEVELS; i++) {
         const src = this.rts[i - 1];
@@ -201,7 +201,7 @@ export class PostFX {
         this.upMat.uniforms.uWeight.value = 0.55;
         this.pass(this.upMat, src.texture, src.width, src.height, this.rts[i - 1]);
       }
-      this.compMat.uniforms.uStrength.value = this.strength * (0.22 + 0.38 * night);
+      this.compMat.uniforms.uStrength.value = this.strength * (0.16 + 0.26 * night);
       this.pass(this.compMat, this.rts[0].texture, this.rts[0].width, this.rts[0].height, null);
     } catch (e) {
       // matériel incapable (copie du tampon refusée…) : on désactive le halo

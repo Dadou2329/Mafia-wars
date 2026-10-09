@@ -892,6 +892,14 @@ export class Game {
       case 'quick':
         this.quickCommand(slot, act);
         break;
+      case 'debugTp': {
+        // réservé aux tests automatisés (rendu logiciel trop lent pour marcher jusqu'au but)
+        if (process.env.MW_DEBUG !== '1') return;
+        const y = this.w.nav.heightAt(act.x, act.z);
+        this.teleport(slot, act.x, Number.isFinite(y) ? y : 0, act.z, act.yaw ?? 0);
+        if (typeof act.dayTime === 'number') this.dayTime = ((act.dayTime % 1) + 1) % 1;
+        break;
+      }
       case 'interact': {
         // passant abattu (les passants n'existent que chez le client) : la police s'en mêle
         if (act.what === 'civilian') {

@@ -24,6 +24,7 @@ interface Group {
   owner: THREE.InstancedBufferAttribute;
   items: Inst[];
   maxDist: number;
+  big: boolean;
 }
 
 /** Accessoires gérés séparément (animés). */
@@ -79,11 +80,17 @@ export class PropRenderer {
         return { matrix, x: p.x, z: p.z, building: p.building, interior, tinted: !!def.tinted };
       });
       const big = def.size[1] > 2.5 || kind === 'LAMP_POST' || kind === 'LAMP_WALL' || kind === 'LAMP_DOUBLE';
-      this.groups.push({ kind, mesh, owner, items, maxDist: big ? 150 : 70 });
+      this.groups.push({ kind, mesh, owner, items, maxDist: big ? 150 : 70, big });
       this.group.add(mesh);
       this.stats.instances += list.length;
     }
     this.stats.kinds = this.groups.length;
+  }
+
+  /** Distances d'affichage des petits et des grands accessoires (qualité graphique). */
+  setDistances(small: number, big: number): void {
+    for (const g of this.groups) g.maxDist = g.big ? big : small;
+    this.dirty = true;
   }
 
   /** Change la couleur des accessoires teintés d'un bâtiment (0 neutre, 1 Dadou, 2 Even). */

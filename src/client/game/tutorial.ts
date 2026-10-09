@@ -100,9 +100,15 @@ export class Tutorial {
     let done = false;
     switch (this.step) {
       case 'intro':
-      case 'desk':
-        text = `Entrez dans votre bureau, ${gc.you === 'dadou' ? 'au fond du Lion Rouge' : 'au fond de l’Ancre Bleue'} (derrière la salle du bar), et appuyez sur ${this.key('interact')} devant votre table de travail.`;
+      case 'desk': {
+        const desk = gc.world.buildings[HQ_BUILDING[gc.you].id].desk;
+        const p = gc.player.pos;
+        const near = !!desk && Math.hypot(desk.x - p.x, desk.z - p.z) < 6;
+        text = near
+          ? `Vous êtes dans votre bureau : approchez-vous de votre table de travail et appuyez sur ${this.key('interact')} pour ouvrir la carte stratégique.`
+          : `Retournez dans votre bureau, ${gc.you === 'dadou' ? 'au fond du Lion Rouge' : 'au fond de l’Ancre Bleue'} (derrière la salle du bar), et appuyez sur ${this.key('interact')} devant votre table de travail.`;
         break;
+      }
       case 'order':
         text = `Sur la carte, cliquez sur ${leNom(this.targetName)}, puis « Attaquer » : choisissez votre lieutenant et lancez l’attaque.`;
         break;
@@ -156,6 +162,7 @@ export class Tutorial {
         if (this.t > 4) this.advance('desk');
         break;
       case 'desk':
+        this.setGoal();
         if (this.t > 30) this.hint('desk-path', `Astuce : le bureau ${DE_BOSS[this.gc.you]} est la pièce tapissée au fond du pub, derrière le comptoir. Sa porte porte une plaque de laiton.`);
         break;
       case 'order':

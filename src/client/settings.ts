@@ -95,15 +95,15 @@ export function resetSettings(keepName = true): void {
 }
 
 /** Paramètres graphiques dérivés de la qualité. */
-export function qualityProfile(q: Quality): { shadow: number; pixelRatio: number; propDist: number; charDist: number; fogScale: number; antialias: boolean } {
+export function qualityProfile(q: Quality): { shadow: number; pixelRatio: number; propDist: number; charDist: number; fogScale: number; antialias: boolean; drawDist: number } {
   switch (q) {
     case 'basse':
-      return { shadow: 0, pixelRatio: 0.75, propDist: 45, charDist: 70, fogScale: 1.35, antialias: false };
+      return { shadow: 0, pixelRatio: 0.75, propDist: 45, charDist: 70, fogScale: 1.45, antialias: false, drawDist: 95 };
     case 'moyenne':
-      return { shadow: 1024, pixelRatio: 1, propDist: 60, charDist: 90, fogScale: 1.15, antialias: false };
+      return { shadow: 1024, pixelRatio: 1, propDist: 60, charDist: 90, fogScale: 1.2, antialias: false, drawDist: 135 };
     case 'haute':
-      return { shadow: 2048, pixelRatio: 1, propDist: 75, charDist: 110, fogScale: 1, antialias: true };
+      return { shadow: 2048, pixelRatio: 1, propDist: 75, charDist: 110, fogScale: 1, antialias: true, drawDist: 200 };
     case 'ultra':
-      return { shadow: 4096, pixelRatio: Math.min(2, window.devicePixelRatio || 1), propDist: 100, charDist: 140, fogScale: 0.9, antialias: true };
+      return { shadow: 4096, pixelRatio: Math.min(2, window.devicePixelRatio || 1), propDist: 100, charDist: 140, fogScale: 0.9, antialias: true, drawDist: 1000 };
   }
 }

@@ -160,7 +160,9 @@ export type ClientAction =
   | { a: 'quick'; cmd: 'follow' | 'attack' | 'defend' | 'retreat'; target?: number; building?: number; x?: number; z?: number }
   | { a: 'customize'; custom: Record<string, unknown> }
   | { a: 'interact'; what: string }
-  | { a: 'rematch' };
+  | { a: 'rematch' }
+  /** Outil de test : téléportation (serveur lancé avec MW_DEBUG=1 uniquement). */
+  | { a: 'debugTp'; x: number; z: number; yaw?: number; dayTime?: number };
 
 // ---------------------------------------------------------------------------- instantanés binaires
 

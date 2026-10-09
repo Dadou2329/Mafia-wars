@@ -100,6 +100,8 @@ export class GameClient {
   /** Événement aléatoire en cours (annoncé par le serveur). */
   activeEvent: Extract<GameEvent, { t: 'event' }> | null = null;
   private fogBoost = 1;
+  private regions: { mesh: THREE.Mesh; x: number; z: number; r: number }[] = [];
+  private cullAcc = 1;
   private water: ReturnType<typeof createWater>;
   pub: PublicState;
   priv: PrivateState;
@@ -154,12 +156,21 @@ export class GameClient {
     this.camera = new THREE.PerspectiveCamera(settings.fov, window.innerWidth / window.innerHeight, 0.08, 520);
     createMaterialTexture();
     createLightTexture(world.light);
-    this.scene.add(buildWorldGroup(world.regions, createWorldMaterial()));
+    const worldGroup = buildWorldGroup(world.regions, createWorldMaterial());
+    this.scene.add(worldGroup);
+    // centres des régions pour la distance d'affichage
+    for (const m of worldGroup.children as THREE.Mesh[]) {
+      const bs = m.geometry.boundingSphere;
+      if (!bs) continue;
+      const c = bs.center.clone().multiply(m.scale).add(m.position);
+      this.regions.push({ mesh: m, x: c.x, z: c.z, r: bs.radius * m.scale.x });
+    }
     this.water = createWater();
     this.scene.add(this.water.mesh);
     this.scene.add(createOuterGround());
     this.atmo = new Atmosphere(this.scene, q.shadow);
     this.props = new PropRenderer(world.props, world.buildings);
+    this.props.setDistances(q.propDist, Math.min(150, q.drawDist));
     this.scene.add(this.props.group);
     this.chars = new CharacterRenderer();
     this.chars.maxDistance = q.charDist;
@@ -634,6 +645,8 @@ export class GameClient {
     this.renderer.shadowMap.enabled = q.shadow > 0;
     this.atmo.setShadowMapSize(q.shadow);
     this.chars.maxDistance = q.charDist;
+    this.props.setDistances(q.propDist, Math.min(150, q.drawDist));
+    this.cullAcc = 1;
     this.post.setEnabled(settings.bloom && settings.quality !== 'basse');
     this.post.setSize(window.innerWidth, window.innerHeight);
     this.myView.custom = settings.custom[this.you];
@@ -644,6 +657,19 @@ export class GameClient {
       const m = (o as THREE.Mesh).material as THREE.Material | undefined;
       if (m) m.needsUpdate = true;
     });
+  }
+
+  /** Distance d'affichage selon la qualité : régions lointaines masquées, plan lointain réduit. */
+  private cullRegions(cam: THREE.Vector3): void {
+    const q = qualityProfile(settings.quality);
+    const d = q.drawDist;
+    for (const r of this.regions) r.mesh.visible = Math.hypot(r.x - cam.x, r.z - cam.z) - r.r < d;
+    const far = Math.min(520, d + 80);
+    if (this.camera.far !== far) {
+      this.camera.far = far;
+      this.camera.updateProjectionMatrix();
+      this.atmo.sky.scale.setScalar(Math.min(1, (far * 0.92) / 380));
+    }
   }
 
   private onResize = (): void => {
@@ -702,6 +728,11 @@ export class GameClient {
     this.chars.update(list, this.camera, now, dt);
     // ------------------------------------------------- monde
     const camPos = this.camera.position;
+    this.cullAcc += dt;
+    if (this.cullAcc > 0.25) {
+      this.cullAcc = 0;
+      this.cullRegions(camPos);
+    }
     this.props.update(camPos);
     this.doors.update(dt, list, camPos);
     this.signs.update(camPos);
@@ -887,13 +918,20 @@ export class GameClient {
     if (bid >= 0 && BUILDINGS[bid].capturable) {
       const st = this.pub.buildings[bid];
       const def = BUILDINGS[bid];
-      const ownerName = st.owner === 1 ? 'Dadou' : st.owner === 2 ? 'Even' : st.guards > 0 ? (DISTRICTS.find((x) => x.id === def.district)?.gang ?? 'un gang') : 'à vendre';
       if (st.cap > 0 || st.contested) {
         const who = st.capBy === this.myFaction ? 'Capture' : 'Ennemis en train de capturer';
         hud.setCapture(`${def.name} — ${st.contested ? 'CONTESTÉ !' : `${who} : ${Math.round(st.cap * 100)} %`}`, st.cap, st.contested);
-      } else if (st.owner !== this.myFaction) {
-        hud.setCapture(`${def.name} — tenu par ${leNom(ownerName)}. Éliminez les défenseurs et restez à l’intérieur.`, 0, false);
-      } else hud.setCapture(null);
+      } else if (st.owner === Faction.DADOU || st.owner === Faction.EVEN) {
+        if (st.owner !== this.myFaction) hud.setCapture(`${def.name} — tenu par ${st.owner === Faction.DADOU ? 'Dadou' : 'Even'}. Éliminez ses hommes et restez à l’intérieur pour le prendre.`, 0, false);
+        else hud.setCapture(null);
+      } else if (st.guards > 0) {
+        const gang = DISTRICTS.find((x) => x.id === def.district)?.gang ?? 'un gang local';
+        hud.setCapture(`${def.name} — tenu par ${leNom(gang)}. Éliminez les défenseurs et restez à l’intérieur.`, 0, false);
+      } else if (def.price > 0) {
+        hud.setCapture(`${def.name} — à vendre : ${formatMoney(def.price)} (${actionKey(settings.bindings, 'interact')}), ou restez à l’intérieur pour le prendre.`, 0, false);
+      } else {
+        hud.setCapture(`${def.name} — sans protection : restez à l’intérieur pour le prendre.`, 0, false);
+      }
     } else hud.setCapture(null);
     // événement aléatoire
     const ev = this.activeEvent;

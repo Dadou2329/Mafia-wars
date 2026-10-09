@@ -57,7 +57,7 @@ export async function renderPortraits(width = 360, height = 480): Promise<Portra
   scene.add(rim);
   const cr = new CharacterRenderer();
   scene.add(cr.group);
-  const camera = new THREE.PerspectiveCamera(26, width / height, 0.05, 50);
+  const camera = new THREE.PerspectiveCamera(28, width / height, 0.05, 50);
   const out: Portraits = { dadou: '', even: '' };
   for (const slot of ['dadou', 'even'] as const) {
     const v: CharView = {
@@ -83,8 +83,9 @@ export async function renderPortraits(width = 360, height = 480): Promise<Portra
       interactAt: -10,
       deathAt: -10,
     };
-    camera.position.set(slot === 'dadou' ? 0.45 : -0.45, 1.45, 3.3);
-    camera.lookAt(0, 1.05, 0);
+    // cadrage en pied, chapeau compris (le haut-de-forme d'Even dépasse 2 m)
+    camera.position.set(slot === 'dadou' ? 0.5 : -0.5, 1.5, 3.85);
+    camera.lookAt(0, 1.13, 0);
     for (let i = 0; i < 30; i++) cr.update([v], camera, 2 + i * 0.016, 0.016);
     renderer.render(scene, camera);
     out[slot] = canvas.toDataURL('image/png');

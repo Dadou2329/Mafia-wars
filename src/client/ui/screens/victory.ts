@@ -83,7 +83,7 @@ export function victoryScreen(
   const sub = w
     ? `${BOSS_NAME[other(w)]} a été vaincu. Londres appartient désormais à ${BOSS_NAME[w]} !`
     : 'Aucun parrain n’a su s’imposer : Londres reste divisée.';
-  const outcomeLabel = outcome === 'win' ? 'Victoire' : outcome === 'loss' ? 'Défaite' : 'Égalité';
+  const outcomeLabel = outcome === 'win' ? 'Victoire' : outcome === 'loss' ? 'Défaite' : 'Fin de la partie';
 
   // ------------------------------------------------------------ bilan
   const head = h(

@@ -290,7 +290,9 @@ vec3 voxelMaterial(int mat, vec3 wpos, vec3 n, vec2 L, out vec3 emissive, out fl
     vec2 f = fract(uv * vec2(4.0, 3.0));
     float bar = 1.0 - step(0.075, min(min(f.x, 1.0 - f.x), min(f.y, 1.0 - f.y)));
     vec2 pane = floor(uv * vec2(4.0, 3.0));
-    bool outside = L.x > 0.35;
+    // côté rue ou côté pièce ? on compare le ciel visible devant la vitre et derrière le mur
+    vec2 Lback = sampleLightVol(wpos - n * 0.8);
+    bool outside = L.x > 0.35 && L.x > Lback.x + 0.04;
     if (outside) {
       col = c1 * (0.75 + 0.3 * h12(pane));
       if (emode == 2) {

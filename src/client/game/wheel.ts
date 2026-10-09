@@ -191,8 +191,9 @@ export class CommandWheel {
     void dt;
     if (this.holdFrames > 0) this.holdFrames--;
     if (!this.visible) {
-      if (input.hit('wheel') && !this.gc.player.dead && !input.blocked) this.show();
-      return;
+      if (!input.hit('wheel') || this.gc.player.dead || input.blocked) return;
+      this.show();
+      // on continue : le choix et le relâchement peuvent arriver dans la même image
     }
     // sélection à la souris
     this.sel.x += input.mouseDX;

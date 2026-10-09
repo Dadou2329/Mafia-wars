@@ -177,11 +177,16 @@ tests/                 tests automatiques
 npm run typecheck      # vérification TypeScript stricte
 npm test               # tests sans navigateur : génération, navigation, simulation complète
                        # (ordres → combats → captures), économie, événements, victoire, textes
-node tests/e2e.mjs     # deux navigateurs (Playwright) : menu, salon, partie, carte, ordres
+node tests/e2e.mjs     # test de bout en bout dans un vrai navigateur (Playwright)
 ```
 
-`tests/e2e.mjs` suppose le serveur de jeu sur le port 3000 et le client sur 5173
-(variable `URL` pour une autre adresse, `API_LOBBY=1` pour passer le salon par le réseau).
+`tests/e2e.mjs` parcourt menu, salon, choix des parrains, partie, tir, roue des ordres, carte
+stratégique avec ordre d’attaque, onglets du bureau et pause, en enregistrant des captures d’écran.
+Il suppose le serveur de jeu sur le port 3000 et le client sur 5173. Options (variables
+d’environnement) : `URL` (autre adresse), `BOT=1` (l’adversaire est un client Socket.IO sans
+navigateur, `tests/bot.mjs`), `LOWGFX=1` (graphismes au minimum), `API_LOBBY=1` (salon piloté par
+le réseau plutôt que par les boutons). Lancé avec `MW_DEBUG=1`, le serveur accepte en plus une
+téléportation de test, utile sur les machines sans carte graphique.
 
 ## État du projet et limites connues
 
