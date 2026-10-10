@@ -1,6 +1,8 @@
 // Serveur de jeu : fichiers statiques du client + Socket.IO (salons et parties).
 
+import { spawn } from 'node:child_process';
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
+import { createRequire } from 'node:module';
 import { existsSync } from 'node:fs';
 import { readFile, stat } from 'node:fs/promises';
 import { networkInterfaces } from 'node:os';
@@ -18,6 +20,26 @@ const here = fileURLToPath(new URL('.', import.meta.url));
 const CLIENT_DIR = resolve(
   process.env.CLIENT_DIR ?? (existsSync(join(here, '..', 'client', 'index.html')) ? join(here, '..', 'client') : join(here, '..', '..', 'dist', 'client')),
 );
+
+/**
+ * Exécutable autonome (MafiaWars.exe, « single executable application » de Node) : les
+ * fichiers du client sont embarqués dans l'exécutable et lus en mémoire.
+ */
+let embedded: ((p: string) => Buffer | null) | null = null;
+try {
+  const sea = createRequire(import.meta.url)('node:sea') as { isSea(): boolean; getAsset(k: string): ArrayBuffer };
+  if (sea.isSea()) {
+    embedded = (p) => {
+      try {
+        return Buffer.from(sea.getAsset(`client${p}`));
+      } catch {
+        return null;
+      }
+    };
+  }
+} catch {
+  /* Node sans module node:sea : fichiers sur disque */
+}
 
 const MIME: Record<string, string> = {
   '.html': 'text/html; charset=utf-8',
@@ -38,6 +60,17 @@ async function serveStatic(req: IncomingMessage, res: ServerResponse): Promise<v
   const url = new URL(req.url ?? '/', 'http://localhost');
   let p = decodeURIComponent(url.pathname);
   if (p === '/') p = '/index.html';
+  if (embedded) {
+    const hit = p.includes('..') ? null : embedded(p);
+    const data = hit ?? embedded('/index.html');
+    const ext = hit ? extname(p) : '.html';
+    res.writeHead(data ? 200 : 404, {
+      'Content-Type': MIME[ext] ?? 'application/octet-stream',
+      'Cache-Control': hit && p.startsWith('/assets/') ? 'public, max-age=31536000, immutable' : 'no-cache',
+    });
+    res.end(data ?? '');
+    return;
+  }
   const file = normalize(join(CLIENT_DIR, p));
   if (!file.startsWith(CLIENT_DIR)) {
     res.writeHead(403).end();
@@ -199,6 +232,45 @@ setInterval(() => {
   }
 }, 60000);
 
+/** Ouvre le jeu dans le navigateur par défaut (exécutable autonome, ou MW_OPEN=1). */
+function openBrowser(url: string): void {
+  try {
+    const child =
+      process.platform === 'win32'
+        ? spawn('cmd', ['/c', 'start', '', url], { detached: true, stdio: 'ignore', windowsHide: true })
+        : spawn(process.platform === 'darwin' ? 'open' : 'xdg-open', [url], { detached: true, stdio: 'ignore' });
+    child.on('error', () => undefined);
+    child.unref();
+  } catch {
+    /* pas de navigateur : l'adresse est affichée dans la console */
+  }
+}
+const autoOpen = !!embedded || process.env.MW_OPEN === '1';
+
+/** Adresse du réseau local la plus probable (on écarte les cartes virtuelles et VPN). */
+function lanAddress(): string | null {
+  const virt = /virtual|vmware|vbox|docker|vethernet|hyper-v|wsl|tailscale|zerotier|vpn|utun|tun|tap/i;
+  let best: string | null = null;
+  for (const [name, list] of Object.entries(networkInterfaces())) {
+    if (virt.test(name)) continue;
+    for (const a of list ?? []) {
+      if (a.family !== 'IPv4' || a.internal) continue;
+      if (/^(192\.168\.|10\.|172\.(1[6-9]|2\d|3[01])\.)/.test(a.address)) return a.address;
+      best ??= a.address;
+    }
+  }
+  return best;
+}
+
+http.on('error', (e: NodeJS.ErrnoException) => {
+  if (e.code === 'EADDRINUSE') {
+    console.error(`\n  Le port ${PORT} est déjà utilisé : le jeu tourne peut-être déjà sur cet ordinateur.`);
+    if (autoOpen) openBrowser(`http://localhost:${PORT}`);
+    console.error('  (Pour utiliser un autre port : définissez la variable PORT, par exemple PORT=3001.)\n');
+    setTimeout(() => process.exit(1), 8000);
+  } else console.error('[serveur]', e);
+});
+
 getWorld();
 http.listen(PORT, HOST, () => {
   console.log(`\n  MAFIA WARS : Dadou vs Even — serveur prêt sur le port ${PORT}`);
@@ -207,6 +279,15 @@ http.listen(PORT, HOST, () => {
     for (const a of list ?? []) {
       if (a.family === 'IPv4' && !a.internal) console.log(`  Sur le réseau local :  http://${a.address}:${PORT}`);
     }
+  }
+  if (autoOpen) {
+    // on ouvre l'adresse du réseau local : le lien d'invitation du salon sera alors valable
+    // pour l'adversaire branché sur le même réseau (Wi-Fi ou câble)
+    const lan = lanAddress();
+    console.log('\n  Le jeu s’ouvre dans votre navigateur. Gardez cette fenêtre ouverte pendant la partie :');
+    console.log('  la fermer arrête le serveur. Sur le même réseau, envoyez à votre adversaire le lien');
+    console.log('  d’invitation du salon (ou l’adresse « réseau local » ci-dessus).');
+    openBrowser(`http://${lan ?? 'localhost'}:${PORT}`);
   }
   console.log('');
 });

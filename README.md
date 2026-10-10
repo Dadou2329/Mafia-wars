@@ -19,7 +19,23 @@ Jeu **3D voxel multijoueur en ligne pour deux joueurs**, dans le navigateur, ent
 
 ---
 
-## Démarrage rapide
+## Le plus simple : la version Windows (.exe)
+
+Pas besoin d’installer Node.js : téléchargez
+[`release/MafiaWars-Windows.zip`](release/MafiaWars-Windows.zip), décompressez-le et
+double-cliquez sur **MafiaWars.exe**. Une fenêtre (le serveur du jeu) s’ouvre, puis le jeu
+s’ouvre dans votre navigateur. Gardez cette fenêtre ouverte pendant la partie.
+
+- Le programme n’est pas signé : si Windows affiche « Windows a protégé votre ordinateur »,
+  cliquez sur « Informations complémentaires » puis « Exécuter quand même ». Autorisez le
+  pare-feu sur les réseaux privés pour jouer à deux.
+- Un seul joueur lance l’exécutable : il crée la partie et envoie le lien d’invitation à son
+  adversaire, qui l’ouvre simplement dans son navigateur (même réseau Wi-Fi ou câble).
+- Pour refabriquer l’exécutable : `npm run build:exe` (→ `release/MafiaWars.exe`), ou
+  `npm run build:exe -- linux` pour un binaire Linux. Le binaire Node.js officiel de la
+  version utilisée est téléchargé depuis nodejs.org, puis le jeu y est intégré.
+
+## Démarrage rapide (développement)
 
 Prérequis : **Node.js 20 ou plus récent** (testé avec Node 22) et un navigateur récent avec WebGL 2
 (Chrome, Edge, Firefox, Safari 16+).

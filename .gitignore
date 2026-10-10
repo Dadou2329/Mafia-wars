@@ -4,3 +4,7 @@ dist/
 .DS_Store
 test-output/
 *.tmp.*
+.cache/
+release/*.exe
+release/MafiaWars-linux
+release/MafiaWars-mac
