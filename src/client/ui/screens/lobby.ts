@@ -128,13 +128,36 @@ function describeChanges(prev: RoomState | null, s: RoomState, me: string): stri
   return out;
 }
 
-/** Lien d'invitation (on garde un éventuel ?server=…). */
-function inviteLink(code: string): string {
+/** Lien d'invitation : adresse publique du tunnel si elle existe (on garde un éventuel ?server=…). */
+function inviteLink(code: string, publicUrl: string | null): string {
   const params = new URLSearchParams();
   const server = new URLSearchParams(location.search).get('server');
   if (server) params.set('server', server);
   params.set('code', code);
+  if (publicUrl && !server) return `${publicUrl}/?${params.toString()}`;
   return `${location.origin}${location.pathname}?${params.toString()}`;
+}
+
+interface PublicInfo {
+  state: 'off' | 'starting' | 'ready' | 'failed';
+  url: string | null;
+}
+
+/** État du lien Internet (tunnel lancé par le serveur de l'exécutable). */
+async function fetchPublic(): Promise<PublicInfo | null> {
+  try {
+    const r = await fetch('/api/public', { cache: 'no-store' });
+    if (!r.ok) return null;
+    const j = (await r.json()) as PublicInfo;
+    return j && typeof j.state === 'string' ? j : null;
+  } catch {
+    return null;
+  }
+}
+
+/** La page est-elle ouverte sur la machine qui héberge (adresse locale) ? */
+function isLocalHost(): boolean {
+  return /^(localhost|127\.|10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.|\[?::1)/.test(location.hostname);
 }
 
 async function copyText(text: string): Promise<boolean> {
@@ -190,6 +213,36 @@ export function lobbyScreen(app: AppApi): { el: HTMLElement; dispose(): void } {
   // ------------------------------------------------------------ en-tête : logo, titre, code
   const codeValue = h('div', { class: 'mw-code-value', title: 'Code du salon' }, '····');
   const copyMsg = h('span', { class: 'mw-copy-msg', role: 'status' });
+  // lien Internet : « en préparation », « prêt » ou « réseau local seulement »
+  const netStatus = h('div', { class: 'mw-net-status', role: 'status' });
+  let publicUrl: string | null = null;
+  let lastPublic: PublicInfo | null = null;
+  // seul l'hôte voit l'état du lien (c'est lui qui l'envoie)
+  const showNet = (p: PublicInfo | null): void => {
+    lastPublic = p;
+    netStatus.className = 'mw-net-status';
+    if (!p || p.state === 'off' || !isLocalHost() || !net.room?.players[me()]?.isHost) {
+      netStatus.textContent = '';
+      return;
+    }
+    if (p.state === 'starting') {
+      netStatus.textContent = fr('Préparation du lien Internet…');
+      netStatus.classList.add('is-wait');
+    } else if (p.state === 'ready') {
+      netStatus.textContent = fr('Lien Internet prêt : votre adversaire peut jouer depuis chez lui.');
+      netStatus.classList.add('is-ok');
+    } else {
+      netStatus.textContent = fr('Lien Internet indisponible : le lien ne marche que sur votre réseau (même Wi-Fi).');
+      netStatus.classList.add('is-bad');
+    }
+  };
+  const pollPublic = async (): Promise<void> => {
+    const p = await fetchPublic();
+    if (disposed) return;
+    publicUrl = p?.state === 'ready' ? p.url : null;
+    showNet(p);
+    if (p && (p.state === 'starting' || p.state === 'ready')) later(() => void pollPublic(), p.state === 'starting' ? 1500 : 10000);
+  };
   const copyBtn = button(app, [icon('link'), 'Copier le lien d’invitation'], 'btn small ghost mw-copy', () => void copyInvite());
   const header = h(
     'header',
@@ -201,13 +254,13 @@ export function lobbyScreen(app: AppApi): { el: HTMLElement; dispose(): void } {
       h('h1', { class: 'title-l' }, 'Choisissez votre parrain'),
       h('p', { class: 'mw-lobby-sub' }, fr('Chaque joueur incarne un parrain. La partie commence dès que les deux sont prêts.')),
     ),
-    h('div', { class: 'mw-code' }, h('div', { class: 'label' }, 'Code du salon'), codeValue, h('div', { class: 'mw-copy-row' }, copyBtn, copyMsg)),
+    h('div', { class: 'mw-code' }, h('div', { class: 'label' }, 'Code du salon'), codeValue, h('div', { class: 'mw-copy-row' }, copyBtn, copyMsg), netStatus),
   );
 
   async function copyInvite(): Promise<void> {
     const code = net.room?.code;
     if (!code) return;
-    const link = inviteLink(code);
+    const link = inviteLink(code, publicUrl);
     if (await copyText(link)) {
       copyMsg.textContent = fr('Lien copié !');
       copyMsg.classList.add('is-visible');
@@ -536,7 +589,10 @@ export function lobbyScreen(app: AppApi): { el: HTMLElement; dispose(): void } {
     starting.setAttribute('aria-hidden', r.phase === 'lobby' ? 'true' : 'false');
   }
 
-  offs.push(net.on('room', () => render()));
+  offs.push(net.on('room', () => {
+    render();
+    showNet(lastPublic);
+  }));
 
   // ------------------------------------------------------------ connexion
   offs.push(
@@ -577,6 +633,7 @@ export function lobbyScreen(app: AppApi): { el: HTMLElement; dispose(): void } {
   shieldPointer(root);
   render();
   renderChat();
+  void pollPublic();
 
   return {
     el: root,

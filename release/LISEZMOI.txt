@@ -1,24 +1,43 @@
 MAFIA WARS : Dadou vs Even — version Windows
 =============================================
 
-LANCER LE JEU
-1. Décompressez l'archive (clic droit > « Extraire tout… »).
+UN SEUL JOUEUR LANCE LE JEU, L'AUTRE OUVRE UN LIEN
+Le joueur qui « héberge » la partie lance MafiaWars.exe. Son adversaire n'a besoin de
+rien installer : il ouvre simplement le lien d'invitation dans son navigateur.
+(Si les deux lancent MafiaWars.exe, chacun a sa propre partie, et le code de l'un
+n'existe pas chez l'autre : c'est le message « Aucune partie avec ce code ».)
+
+POUR L'HÔTE
+1. Décompressez l'archive (clic droit > « Extraire tout… »). Gardez MafiaWars.exe et
+   cloudflared.exe dans le même dossier.
 2. Double-cliquez sur MafiaWars.exe.
    - Windows peut afficher « Windows a protégé votre ordinateur » : le programme n'est pas
      signé. Cliquez sur « Informations complémentaires » puis « Exécuter quand même ».
-   - Le pare-feu peut demander l'autorisation : acceptez pour les « réseaux privés »
-     (nécessaire pour jouer à deux sur le même réseau).
+   - Le pare-feu peut demander l'autorisation : acceptez pour les « réseaux privés ».
 3. Une fenêtre noire (le serveur du jeu) s'ouvre, puis le jeu s'ouvre dans votre navigateur.
    Gardez la fenêtre noire ouverte pendant toute la partie : la fermer arrête le jeu.
+4. Cliquez sur « Créer une partie ». Attendez que le salon affiche
+   « Lien Internet prêt » (quelques secondes), puis cliquez sur
+   « Copier le lien d'invitation » et envoyez ce lien à votre adversaire
+   (Discord, WhatsApp, SMS…).
 
-JOUER À DEUX
-- Sur le même réseau (même box, Wi-Fi ou câble) : un seul joueur lance MafiaWars.exe,
-  clique sur « Créer une partie », puis « Copier le lien d'invitation » et envoie ce lien
-  à son adversaire, qui l'ouvre simplement dans son navigateur (rien à installer).
-- Par Internet : voir le README du projet (redirection du port 3000 ou hébergement).
+POUR L'ADVERSAIRE
+- Ouvrez le lien reçu dans Chrome, Edge ou Firefox. Le salon s'ouvre directement.
+- Vous avez quand même lancé MafiaWars.exe ? Pas de souci : dans « Rejoindre une partie »,
+  collez le lien complet (pas seulement les 4 lettres), le jeu vous y emmène.
+
+LE LIEN INTERNET
+- Il est créé automatiquement grâce à un tunnel Cloudflare gratuit (cloudflared.exe,
+  programme officiel de Cloudflare) : rien à régler sur la box, ça marche même si vous
+  n'êtes pas chez vous. L'adresse ressemble à https://mots-au-hasard.trycloudflare.com
+  et change à chaque lancement : renvoyez le nouveau lien à chaque fois.
+- Si le salon affiche « Lien Internet indisponible », le lien ne marchera que sur le même
+  réseau (même box, Wi-Fi ou câble). Vérifiez votre connexion ou votre antivirus, puis
+  relancez MafiaWars.exe.
 
 BON À SAVOIR
 - Navigateur conseillé : Chrome, Edge ou Firefox récent. Une carte graphique est
   recommandée ; sur un petit ordinateur, choisissez la qualité « Basse » dans les paramètres.
 - Si le port 3000 est déjà pris, lancez le jeu avec un autre port depuis une invite de
   commandes :  set PORT=3001 && MafiaWars.exe
+- Pour ne pas créer de lien Internet :  set MW_TUNNEL=0 && MafiaWars.exe

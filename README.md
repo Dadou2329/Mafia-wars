@@ -29,11 +29,22 @@ s’ouvre dans votre navigateur. Gardez cette fenêtre ouverte pendant la partie
 - Le programme n’est pas signé : si Windows affiche « Windows a protégé votre ordinateur »,
   cliquez sur « Informations complémentaires » puis « Exécuter quand même ». Autorisez le
   pare-feu sur les réseaux privés pour jouer à deux.
-- Un seul joueur lance l’exécutable : il crée la partie et envoie le lien d’invitation à son
-  adversaire, qui l’ouvre simplement dans son navigateur (même réseau Wi-Fi ou câble).
-- Pour refabriquer l’exécutable : `npm run build:exe` (→ `release/MafiaWars.exe`), ou
-  `npm run build:exe -- linux` pour un binaire Linux. Le binaire Node.js officiel de la
-  version utilisée est téléchargé depuis nodejs.org, puis le jeu y est intégré.
+- **Un seul joueur lance l’exécutable** : il crée la partie, attend « Lien Internet prêt »
+  dans le salon, puis envoie le lien d’invitation à son adversaire, qui l’ouvre simplement
+  dans son navigateur. Une partie n’existe que sur l’ordinateur qui l’a créée : si les deux
+  joueurs lancent l’exécutable, le code de l’un est inconnu chez l’autre (« Aucune partie avec
+  ce code ») ; coller le lien complet dans « Rejoindre une partie » emmène alors chez l’hôte.
+- **Lien Internet automatique** : l’exécutable démarre un tunnel Cloudflare gratuit et sans
+  compte (`cloudflared.exe`, livré dans l’archive) ; le lien d’invitation est alors une adresse
+  `https://….trycloudflare.com` qui fonctionne depuis n’importe où, sans rien régler sur la box.
+  Si le tunnel ne peut pas démarrer, le salon l’indique et le lien ne vaut que pour le réseau
+  local. `MW_TUNNEL=0` désactive le tunnel (`MW_TUNNEL=1` le force hors de l’exécutable,
+  `CLOUDFLARED=chemin` désigne le programme).
+- Pour refabriquer l’exécutable : `npm run build:exe` (→ `release/MafiaWars.exe`,
+  `release/cloudflared.exe` et l’archive `release/MafiaWars-Windows.zip`), ou
+  `npm run build:exe -- linux` pour un binaire Linux. Le binaire Node.js officiel est téléchargé
+  depuis nodejs.org et cloudflared (version figée, empreinte SHA-256 vérifiée) depuis les
+  publications GitHub de Cloudflare.
 
 ## Démarrage rapide (développement)
 
@@ -86,6 +97,11 @@ Variables d’environnement : `PORT` (3000 par défaut), `HOST` (0.0.0.0 par dé
 
 ## Jouer par Internet
 
+- **Avec la version Windows** : rien à faire, le lien d’invitation est public (voir plus haut).
+- **Tunnel à la main** (version de développement) : installez
+  [cloudflared](https://developers.cloudflare.com/cloudflare-one/connections/connect-apps/install-and-setup/installation/)
+  puis lancez le serveur avec `MW_TUNNEL=1 npm start` ; l’adresse publique s’affiche dans la
+  console et le salon l’utilise pour le lien d’invitation.
 - **Hébergement simple** : déployez la version de production sur n’importe quel hébergeur Node
   (VPS, Render, Railway, Fly.io…) avec `npm install && npm run build` puis `npm start`.
   Le port d’écoute est lu dans `PORT`. Les deux joueurs ouvrent l’adresse publique.

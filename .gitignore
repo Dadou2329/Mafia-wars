@@ -8,3 +8,5 @@ test-output/
 release/*.exe
 release/MafiaWars-linux
 release/MafiaWars-mac
+release/cloudflared
+release/cloudflared.exe

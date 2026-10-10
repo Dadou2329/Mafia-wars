@@ -796,6 +796,8 @@
   color: rgba(201, 162, 74, 0.28);
 }
 .mw-join-error {
+  max-width: 28em;
+  margin: 0 auto;
   min-height: 1.5em;
   color: #ffab9c;
   font-style: italic;
@@ -1835,6 +1837,22 @@ input[type='range'].mw-range:hover::-webkit-slider-thumb {
 .mw-copy-msg.is-visible {
   opacity: 1;
   transform: none;
+}
+.mw-net-status {
+  max-width: 34em;
+  font-size: 14px;
+  font-style: italic;
+  text-align: right;
+  color: var(--text-dim);
+}
+.mw-net-status:empty {
+  display: none;
+}
+.mw-net-status.is-ok {
+  color: #a9dd96;
+}
+.mw-net-status.is-bad {
+  color: var(--alert);
 }
 
 /* corps : cartes + colonne latérale */

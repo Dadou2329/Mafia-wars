@@ -13,6 +13,19 @@ const NBSP = ' ';
 const NNBSP = ' ';
 
 /** Typographie française : espaces insécables avant « ; ! ? : % » et à l'intérieur des guillemets. */
+/** Lien d'invitation vers un autre serveur que celui de cette page (sinon null). */
+function otherServer(text: string): string | null {
+  try {
+    const u = new URL(text);
+    if (u.protocol !== 'http:' && u.protocol !== 'https:') return null;
+    const here = new URLSearchParams(location.search).get('server');
+    if (u.origin === location.origin && u.searchParams.get('server') === here) return null;
+    return u.href;
+  } catch {
+    return null;
+  }
+}
+
 export function fr(s: string): string {
   return s
     .replace(/ ([;!?])/g, `${NNBSP}$1`)
@@ -521,12 +534,20 @@ export function mainMenu(app: AppApi): HTMLElement {
       sync();
     });
     input.addEventListener('paste', (e) => {
-      const text = e.clipboardData?.getData('text') ?? '';
+      const text = (e.clipboardData?.getData('text') ?? '').trim();
       const m = /[?&]code=([a-z]{4})/i.exec(text);
-      if (m) {
-        e.preventDefault();
-        input.value = m[1].toUpperCase();
+      if (!m) return;
+      e.preventDefault();
+      input.value = m[1].toUpperCase();
+      err.textContent = '';
+      sync();
+      // lien d'une partie hébergée sur un autre ordinateur : on s'y rend directement
+      const target = otherServer(text);
+      if (target) {
+        pending = true;
         sync();
+        go.textContent = 'Connexion…';
+        location.href = target;
       }
     });
     input.addEventListener('keydown', (e) => {
@@ -560,7 +581,11 @@ export function mainMenu(app: AppApi): HTMLElement {
       go.textContent = 'Rejoindre';
       sync();
       if (e) {
-        err.textContent = fr(e);
+        err.textContent = fr(
+          e === 'Aucune partie avec ce code.'
+            ? 'Aucune partie avec ce code ici. La partie existe seulement chez votre adversaire : collez plutôt son lien d’invitation.'
+            : e,
+        );
         app.audio.play('ui_error');
         input.select();
       } else close();
@@ -570,11 +595,11 @@ export function mainMenu(app: AppApi): HTMLElement {
       { class: 'panel mw-modal-box mw-join', role: 'dialog', 'aria-modal': 'true', 'aria-label': 'Rejoindre une partie' },
       h('h2', { class: 'title-l' }, 'Rejoindre une partie'),
       h('div', { class: 'divider' }),
-      h('p', { class: 'mw-modal-text' }, fr('Saisissez le code de 4 lettres que votre adversaire vous a transmis.')),
+      h('p', { class: 'mw-modal-text' }, fr('Collez ici le lien d’invitation que votre adversaire vous a envoyé (ou son code de 4 lettres).')),
       h('div', { class: 'mw-code-plate' }, input),
       err,
       h('div', { class: 'mw-modal-actions' }, cancel, go),
-      h('p', { class: 'mw-join-hint dim' }, fr('Astuce : vous pouvez aussi coller le lien d’invitation.')),
+      h('p', { class: 'mw-join-hint dim' }, fr('Astuce : le plus simple est d’ouvrir directement le lien d’invitation dans votre navigateur.')),
     );
     const close = openOverlay(app, root, box, () => close());
     sync();

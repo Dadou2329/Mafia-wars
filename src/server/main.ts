@@ -10,6 +10,7 @@ import { extname, join, normalize, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Server } from 'socket.io';
 import { Room, makeCode, rooms, type Session } from './room';
+import { startTunnel, tunnelInfo } from './tunnel';
 import { getWorld } from './world';
 
 const PORT = Number(process.env.PORT ?? 3000);
@@ -100,6 +101,11 @@ async function serveStatic(req: IncomingMessage, res: ServerResponse): Promise<v
 const http = createServer((req, res) => {
   if (req.url?.startsWith('/health')) {
     res.writeHead(200, { 'Content-Type': 'application/json' }).end(JSON.stringify({ ok: true, rooms: rooms.size }));
+    return;
+  }
+  // adresse publique du tunnel (lien d'invitation valable sur Internet)
+  if (req.url?.startsWith('/api/public')) {
+    res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }).end(JSON.stringify(tunnelInfo()));
     return;
   }
   void serveStatic(req, res);
@@ -246,6 +252,8 @@ function openBrowser(url: string): void {
   }
 }
 const autoOpen = !!embedded || process.env.MW_OPEN === '1';
+// lien Internet automatique dans l'exécutable (MW_TUNNEL=0 pour s'en passer, MW_TUNNEL=1 pour le forcer)
+const useTunnel = process.env.MW_TUNNEL ? process.env.MW_TUNNEL === '1' : !!embedded;
 
 /** Adresse du réseau local la plus probable (on écarte les cartes virtuelles et VPN). */
 function lanAddress(): string | null {
@@ -285,9 +293,25 @@ http.listen(PORT, HOST, () => {
     // pour l'adversaire branché sur le même réseau (Wi-Fi ou câble)
     const lan = lanAddress();
     console.log('\n  Le jeu s’ouvre dans votre navigateur. Gardez cette fenêtre ouverte pendant la partie :');
-    console.log('  la fermer arrête le serveur. Sur le même réseau, envoyez à votre adversaire le lien');
-    console.log('  d’invitation du salon (ou l’adresse « réseau local » ci-dessus).');
+    console.log('  la fermer arrête le serveur.');
+    console.log('  Votre adversaire n’a PAS besoin de lancer MafiaWars.exe : envoyez-lui le lien d’invitation');
+    console.log('  du salon (bouton « Copier le lien d’invitation »), il l’ouvre dans son navigateur.');
     openBrowser(`http://${lan ?? 'localhost'}:${PORT}`);
   }
   console.log('');
+  if (useTunnel) {
+    console.log('  Préparation du lien Internet (Cloudflare)…');
+    startTunnel(
+      PORT,
+      (url) => {
+        console.log(`\n  Lien Internet prêt : ${url}`);
+        console.log('  Le lien d’invitation du salon fonctionne maintenant depuis n’importe où.\n');
+      },
+      (why) => {
+        console.log(`\n  Lien Internet indisponible (${why}).`);
+        console.log('  Le lien d’invitation ne fonctionnera que pour un adversaire sur le même réseau');
+        console.log('  (même Wi-Fi ou même box). Voir LISEZMOI.txt pour jouer par Internet autrement.\n');
+      },
+    );
+  }
 });
